@@ -230,6 +230,7 @@ dependencies {
 }
 
 mavenPublishing {
+    publishToMavenCentral(true)
     coordinates("com.dshatz.pdfmp", "pdfmp", "1.0.0")
 
     pom {
