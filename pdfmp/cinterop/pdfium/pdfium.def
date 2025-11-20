@@ -1,0 +1,9 @@
+packageName = com.dshatz.pdfium.cinterop
+
+# The .h files to parse. Use the path relative to this .def file.
+headers = include/fpdfview.h
+
+# (Optional but recommended)
+# Tell the tool to only include definitions from your headers,
+# not from system headers they might include (like <stdio.h>)
+headerFilter = include/*
