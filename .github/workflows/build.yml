@@ -1,0 +1,48 @@
+name: Test & Publish
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  release:
+    types: [created]  # Triggers publishing when a release is created
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  packages: write  # Required for publishing to GitHub Packages
+
+jobs:
+  publish:
+    if: github.event_name == 'release'
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - id: get_version
+        name: Get version
+        uses: jannemattila/get-version-from-tag@v4
+      - name: Publish to Maven Repository
+        run: |
+          VERSION=$(echo "${{ steps.get_version.outputs.version }}")
+          ./gradlew :pdfmp:publishAndReleaseToMavenCentral -Pversion=$VERSION -Dorg.gradle.configuration-cache=false
+          ./gradlew :pdfmp-compose:publishAndReleaseToMavenCentral -Pversion=$VERSION -Dorg.gradle.configuration-cache=false
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
