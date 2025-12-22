@@ -1,7 +1,9 @@
 @file:OptIn(ExperimentalComposeLibrary::class)
 
 import org.jetbrains.compose.ExperimentalComposeLibrary
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFrameworkConfig
 
 plugins {
     alias(libs.plugins.mp)
@@ -13,6 +15,23 @@ plugins {
 
 version = project.findProperty("version") as? String ?: "0.1.0-SNAPSHOT1"
 
+
+fun KotlinNativeTarget.setupIosFramework(xcf: XCFrameworkConfig) {
+    val pdfiumFolder = name
+
+    binaries {
+        framework {
+            baseName = "pdfmpcompose"
+
+            val binariesModuleDir = project(":pdfium-binaries").projectDir
+            linkerOpts += "-L$binariesModuleDir/binaries/$pdfiumFolder"
+            linkerOpts += "-lpdfium"
+
+            xcf.add(this)
+        }
+    }
+}
+
 kotlin {
     jvmToolchain(21)
     androidTarget()
@@ -22,10 +41,7 @@ kotlin {
 
     val xcf = XCFramework()
     iosTargets.forEach {
-        it.binaries.framework {
-            baseName = "pdfmpcompose"
-            xcf.add(this)
-        }
+        it.setupIosFramework(xcf)
     }
 
     sourceSets {
