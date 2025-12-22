@@ -18,7 +18,7 @@ internal actual fun CurrentImage.toImageBitmap(): RecyclableBitmap {
         val (width, height) = loadedTransforms.calculateSize()
 
         if (width == 0 || height == 0) {
-            RecyclableBitmap(ImageBitmap(1, 1), {})
+            RecyclableBitmap(ImageBitmap(1, 1))
         } else {
             val bytes = buffer.byteArray
 
@@ -35,9 +35,7 @@ internal actual fun CurrentImage.toImageBitmap(): RecyclableBitmap {
                 width * 4
             )
 
-            RecyclableBitmap(image.toComposeImageBitmap(), {
-                image.close()
-            })
+            RecyclableBitmap(image.toComposeImageBitmap())
         }
     }
     return imageBitmap
