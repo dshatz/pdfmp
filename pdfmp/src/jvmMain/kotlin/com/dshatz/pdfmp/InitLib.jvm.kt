@@ -3,6 +3,7 @@ package com.dshatz.pdfmp
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
+import kotlin.io.path.createTempDirectory
 import kotlin.use
 
 actual class InitLib {
@@ -25,20 +26,21 @@ actual class InitLib {
 
         val resourcePath = "/lib/$platformDir/$fileName"
 
+        val tmpDir = createTempDirectory("pdfmp_libs").toFile()
+        tmpDir.deleteOnExit()
+        val tmpFile = File(tmpDir, fileName)
+
         val resourceStream = InitLib::class.java.getResourceAsStream(resourcePath)
             ?: throw UnsatisfiedLinkError("Native library not found in JAR at: $resourcePath")
 
-        val tempFile = File.createTempFile(prefix + baseName, ".$extension")
-        tempFile.deleteOnExit()
-
-        FileOutputStream(tempFile).use { out ->
+        FileOutputStream(tmpFile).use { out ->
             resourceStream.use { it.copyTo(out) }
         }
 
         try {
-            System.load(tempFile.absolutePath)
+            System.load(tmpFile.absolutePath)
         } catch (e: UnsatisfiedLinkError) {
-            e("Failed to load library: ${tempFile.absolutePath}", e)
+            e("Failed to load library: ${tmpFile.absolutePath}", e)
             throw e
         }
     }
