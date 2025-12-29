@@ -19,8 +19,10 @@ actual class ConsumerBuffer(
         skiaBitmap.height,
         skiaBitmap.rowBytes
     )
-    actual override fun <T> withAddress(action: (Long) -> T): T {
-        return skiaBitmap.peekPixels()?.buffer?.writableData()?.toLong()?.let(action) ?: error("Could not read bitmap buffer address")
+    actual override suspend fun <T> withAddress(action: suspend (Long) -> T): T {
+        return skiaBitmap.peekPixels()?.buffer?.writableData()?.toLong()?.let {
+            action(it)
+        } ?: error("Could not read bitmap buffer address")
     }
 
     actual override fun capacity(): SizeB {

@@ -84,10 +84,10 @@ fun getPageRatios(rendererPtr: PdfRendererPtr): ByteArray {
     className = CLASS_NAME,
     functionName = "render"
 )
-fun render(renderer: PdfRendererPtr, reqBytes: ByteArray): ByteArray {
+fun render(renderer: PdfRendererPtr, reqBytes: ByteArray): ByteArray = runBlocking {
     val renderer = renderer.getRenderer()
     val req = RenderRequest.unpack(reqBytes)
-    return returnResult(
+    returnResult(
         renderer.render(req),
         RenderResponse::pack
     )

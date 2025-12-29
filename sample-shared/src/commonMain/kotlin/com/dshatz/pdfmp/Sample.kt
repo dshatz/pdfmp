@@ -95,6 +95,14 @@ fun Sample() {
                     Text("Missing file")
                 }
             )
+
+            Tab(
+                selected = selected == 5,
+                onClick = { selected = 5 },
+                content = {
+                    Text("Large file")
+                }
+            )
         }
         AnimatedContent(selected, modifier = Modifier.weight(1f)) {
             if (it == 0) {
@@ -105,8 +113,10 @@ fun Sample() {
                 LandscapeDoc()
             } else if (it == 3) {
                 ColoredDoc()
-            } else {
+            } else if (it == 4) {
                 MissingDoc()
+            } else {
+                LargeFile()
             }
         }
 
@@ -259,5 +269,16 @@ private fun MissingDoc() {
         (state as? DisplayState.Error)?.error?.let {
             Text(it.message.orEmpty(), modifier = Modifier.align(Alignment.Center))
         }
+    }
+}
+
+@Composable
+private fun LargeFile() {
+    val pdf = rememberPdfState(PdfSource.PdfPath(Path("/home/dshatz/Downloads/200MB-TESTFILE.ORG.pdf")))
+    Box {
+        PdfView(
+            pdf,
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }

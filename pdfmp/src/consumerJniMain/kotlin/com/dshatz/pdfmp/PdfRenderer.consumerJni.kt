@@ -7,7 +7,7 @@ import kotlinx.io.Buffer
 
 actual class PdfRenderer(private val renderer: PdfRendererPtr) {
     
-    actual fun render(renderRequest: RenderRequest): Result<RenderResponse> {
+    actual suspend fun render(renderRequest: RenderRequest): Result<RenderResponse> {
         return runCatching {
             val packed = renderRequest.pack()
             val response = unpackResult(

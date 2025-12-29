@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -30,6 +31,7 @@ import com.dshatz.pdfmp.compose.platformModifier.platformScrollableModifier
 import com.dshatz.pdfmp.compose.state.PdfState
 import com.dshatz.pdfmp.compose.tools.TransformedBitmapRenderer
 import com.dshatz.pdfmp.compose.tools.pageTransformModifier
+import com.dshatz.pdfmp.d
 import com.dshatz.pdfmp.model.calculateSize
 import kotlinx.coroutines.delay
 
@@ -152,11 +154,12 @@ private fun BaseImage(
     modifier: Modifier = Modifier,
 ) {
     val transforms by state.produceImageTransforms()
+    val uncutTransforms = transforms.map { it.uncut().copy(topGap = 0) }
 
     val baseImageCache = remember { mutableStateMapOf<Int, CurrentImage>() }
     val viewPortCache = remember { mutableStateOf<Size?>(null) }
 
-    LaunchedEffect(transforms, state.viewport.value) {
+    LaunchedEffect(uncutTransforms, state.viewport.value) {
         val currentViewport = state.viewport.value
         val viewportChanged = viewPortCache.value != currentViewport
 
@@ -193,7 +196,9 @@ private fun BaseImage(
         }
 
         // remove pages that are no longer visible from cache
-        val toRemove = baseImageCache.filter { it.key !in transforms.map { t -> t.pageIndex } }
+        val toRemove = baseImageCache.filter {
+            it.key !in transforms.map { t -> t.pageIndex }
+        }
         baseImageCache.keys.removeAll(toRemove.keys)
         toRemove.forEach { it.value.free() }
     }

@@ -18,6 +18,7 @@ import com.dshatz.pdfmp.model.RenderResponse
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -331,7 +332,7 @@ data class PdfState(
         return (pageSpacing * scale.value).toInt()
     }
 
-    internal fun renderViewport(transforms: List<PageTransform>): Pair<RenderResponse, ConsumerBuffer>? {
+    internal suspend fun renderViewport(transforms: List<PageTransform>): Pair<RenderResponse, ConsumerBuffer>? {
         // We can just grab the offset of the first visible page.
         // Subsequent pages are automatically spaced by the native renderer.
         val topOffset = visiblePages.value.firstOrNull()?.topGap ?: 0
@@ -340,41 +341,45 @@ data class PdfState(
         if (transforms.isEmpty()) return null
 
         val buffer = bufferPool.getBufferViewport(transforms)
-        return buffer.withAddress {
-            val response = renderer.render(
-                RenderRequest(
-                    transforms,
-                    pageSpacing,
-                    topOffset,
-                    buffer.dimensions.withAddress(it),
+        return withContext(Dispatchers.IO) {
+            buffer.withAddress {
+                val response = renderer.render(
+                    RenderRequest(
+                        transforms,
+                        pageSpacing,
+                        topOffset,
+                        buffer.dimensions.withAddress(it),
+                    )
                 )
-            )
-            response.map { resp ->
-                resp to buffer
-            }.onFailure { error ->
-                this.error.value = error
-                e("Failed to render viewport", error)
-            }.getOrNull()
+                response.map { resp ->
+                    resp to buffer
+                }.onFailure { error ->
+                    this@PdfState.error.value = error
+                    e("Failed to render viewport", error)
+                }.getOrNull()
+            }
         }
     }
 
-    internal fun renderFullPage(transform: PageTransform): Pair<RenderResponse, ConsumerBuffer>? {
+    internal suspend fun renderFullPage(transform: PageTransform): Pair<RenderResponse, ConsumerBuffer>? {
         val buffer = bufferPool.getBufferPage(transform)
-        return buffer.withAddress {
-            val response = renderer.render(
-                RenderRequest(
-                    listOf(transform),
-                    0,
-                    0,
-                    buffer.dimensions.withAddress(it)
+        return withContext(Dispatchers.IO) {
+            buffer.withAddress {
+                val response = renderer.render(
+                    RenderRequest(
+                        listOf(transform),
+                        0,
+                        0,
+                        buffer.dimensions.withAddress(it)
+                    )
                 )
-            )
-            response.map { resp ->
-                resp to buffer
-            }.onFailure { error ->
-                this.error.value = error
-                e("Failed to render pages", error)
-            }.getOrNull()
+                response.map { resp ->
+                    resp to buffer
+                }.onFailure { error ->
+                    this@PdfState.error.value = error
+                    e("Failed to render pages", error)
+                }.getOrNull()
+            }
         }
     }
 

@@ -46,7 +46,7 @@ actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
     }
 
     @OptIn(UnsafeNumber::class)
-    actual fun render(renderRequest: RenderRequest): Result<RenderResponse> = synchronized(this) {
+    actual suspend fun render(renderRequest: RenderRequest): Result<RenderResponse> = synchronized(this) {
         runCatching {
             renderPages(
                 renderRequest.transforms,
