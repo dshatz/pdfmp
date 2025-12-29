@@ -1,6 +1,8 @@
 package com.dshatz.pdfmp.compose.state
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.*
 import androidx.compose.ui.geometry.Offset
@@ -210,14 +212,18 @@ data class PdfState(
         totalContentHeight += scaledPageSpacing() * (pages.size - 1)
 
         val maxY = (totalContentHeight - viewport.value.height).coerceAtLeast(0f)
+
         val newX = (currentX - delta.x).coerceIn(0f, maxX)
         val newY = (currentY - delta.y).coerceIn(0f, maxY)
 
+        val dy = newY - currentY
+        val dx = newX - currentX
+
         renderingX.floatValue = newX
         renderingY.floatValue = newY
-        reportHorizontalOffset(newX.toInt())
 
-        updateUiScrollPosition(newX, newY, scale.value)
+        listState.dispatchRawDelta(-dy)
+        horizontalScrollState.dispatchRawDelta(-dx)
 
         return delta
     }
