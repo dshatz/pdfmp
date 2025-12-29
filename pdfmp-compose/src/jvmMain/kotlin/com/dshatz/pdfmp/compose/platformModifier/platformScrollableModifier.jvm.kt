@@ -1,5 +1,9 @@
 package com.dshatz.pdfmp.compose.platformModifier
 
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -11,8 +15,39 @@ import androidx.compose.ui.input.pointer.onPointerEvent
 import com.dshatz.pdfmp.compose.state.PdfState
 
 actual fun Modifier.platformScrollableModifier(state: PdfState): Modifier = composed {
-    biDirectionalScroll(state)
+    if (CurrentPlatform == DesktopPlatform.MacOS) {
+        biDirectionalScroll(state)
+    } else {
+        val vertical = rememberScrollableState {
+            state.onScroll(Offset(0f, it)).y
+        }
+        val horizontal = rememberScrollableState {
+            state.onScroll(Offset(it, 0f)).x
+        }
+        scrollable(vertical, Orientation.Vertical)
+            .scrollable(horizontal, Orientation.Horizontal)
+    }
 }
+
+
+enum class DesktopPlatform {
+    Linux,
+    Windows,
+    MacOS,
+    Unknown
+}
+
+private val CurrentPlatform: DesktopPlatform by lazy {
+    val name = System.getProperty("os.name")
+    when {
+        name?.startsWith("Linux") == true -> DesktopPlatform.Linux
+        name?.startsWith("Win") == true -> DesktopPlatform.Windows
+        name == "Mac OS X" -> DesktopPlatform.MacOS
+        else -> DesktopPlatform.Unknown
+    }
+}
+
+
 
 
 @OptIn(ExperimentalComposeUiApi::class)
