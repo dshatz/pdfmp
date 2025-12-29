@@ -427,7 +427,9 @@ data class PdfState(
 
             onDispose {
                 isInitialized.value = false
-                renderer.close()
+                if (this@PdfState::renderer.isInitialized) {
+                    renderer.close()
+                }
             }
         }
     }
