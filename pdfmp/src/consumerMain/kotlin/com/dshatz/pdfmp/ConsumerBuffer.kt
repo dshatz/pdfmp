@@ -3,7 +3,17 @@ package com.dshatz.pdfmp
 import com.dshatz.pdfmp.model.BufferDimensions
 import com.dshatz.pdfmp.model.SizeB
 
-expect class ConsumerBuffer {
+expect class ConsumerBuffer: IConsumerBuffer {
+    override fun <T> withAddress(action: (Long) -> T): T
+    override fun capacity(): SizeB
+    override fun free()
+    override fun dispose()
+    override val isFree: Boolean
+    override fun setUnfree()
+    override val dimensions: BufferDimensions
+}
+
+interface IConsumerBuffer {
     fun <T> withAddress(action: (Long) -> T): T
     fun capacity(): SizeB
 

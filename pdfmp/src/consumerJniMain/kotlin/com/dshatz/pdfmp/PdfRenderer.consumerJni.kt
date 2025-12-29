@@ -5,12 +5,10 @@ import com.dshatz.pdfmp.model.RenderResponse
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.io.Buffer
 
-actual class PdfRenderer actual constructor(private val source: PdfSource) {
-
-    private val renderer = unpackResult(PDFBridge.openFile(source.pack()), Buffer::readLong)
+actual class PdfRenderer(private val renderer: PdfRendererPtr) {
     
     actual fun render(renderRequest: RenderRequest): Result<RenderResponse> {
-        return renderer.mapCatching { renderer ->
+        return runCatching {
             val packed = renderRequest.pack()
             val response = unpackResult(
                 PDFBridge.render(renderer,packed),
@@ -21,18 +19,27 @@ actual class PdfRenderer actual constructor(private val source: PdfSource) {
     }
 
     actual fun close() {
-        renderer.getOrNull()?.let(PDFBridge::close)
+        PDFBridge.close(renderer)
     }
 
     actual fun getPageCount(): Result<Int> {
-        return renderer.mapCatching {
-            unpackResult(PDFBridge.getPageCount(it), Buffer::readInt).getOrThrow()
+        return runCatching {
+            unpackResult(PDFBridge.getPageCount(renderer), Buffer::readInt).getOrThrow()
         }
     }
 
     actual fun getPageRatios(): Result<List<Float>> {
-        return renderer.mapCatching {
-            unpackResult(PDFBridge.getPageRatios(it), ::unpackFloats).getOrThrow()
+        return runCatching {
+            unpackResult(PDFBridge.getPageRatios(renderer), ::unpackFloats).getOrThrow()
         }
+    }
+}
+
+actual object PdfRendererFactory {
+    actual fun createFromSource(
+        source: PdfSource,
+    ): Result<PdfRenderer> {
+        val nativePtr: Result<PdfRendererPtr> = unpackResult(PDFBridge.createNativeRenderer(source.pack()), Buffer::readLong)
+        return nativePtr.map { PdfRenderer(it) }
     }
 }

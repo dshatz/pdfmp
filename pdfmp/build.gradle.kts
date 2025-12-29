@@ -1,7 +1,5 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
-import org.gradle.nativeplatform.MachineArchitecture
-import org.gradle.nativeplatform.OperatingSystemFamily
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.SharedLibrary
@@ -34,11 +32,26 @@ private val androidArchMap = mapOf(
 )
 
 fun KotlinNativeTarget.setUpPdfiumCinterop() {
+    val targetName = name
     compilations.getByName("main").cinterops {
         create("pdfium") {
+            val binariesModuleDir = rootProject.project("pdfium-binaries").projectDir
+            val platformFolder = when (targetName) {
+                "iosArm64" -> "ios-arm64"
+                "iosX64", "iosSimulatorArm64" -> "ios-arm64_x86_64-simulator"
+                else -> null // Skip unsupported native targets
+            }
+
             defFile("${projectDir}/cinterop/pdfium/pdfium.def")
             compilerOpts.add("-I${projectDir}/cinterop/pdfium")
             packageName("com.dshatz.internal.pdfium")
+
+            // ios only
+            if (platformFolder != null) {
+                val libPath = "$binariesModuleDir/binaries/ios-framework/pdfium.xcframework/$platformFolder"
+                extraOpts("-staticLibrary", "libpdfium.a", "-libraryPath", libPath)
+//                 includeDirs("$libPath/Headers")
+            }
         }
     }
 }
@@ -66,6 +79,34 @@ private fun KotlinNativeTarget.setupSharedLib() {
     }
 }
 
+fun KotlinNativeTarget.setupIosFramework() {
+    val targetName = name
+    binaries {
+        val binariesModuleDir = project(":pdfium-binaries").projectDir
+        val sliceName = when (targetName) {
+            "iosArm64" -> "ios-arm64"
+            "iosX64", "iosSimulatorArm64" -> "ios-arm64_x86_64-simulator"
+            else -> throw GradleException("Unknown target for PDFium: $targetName")
+        }
+        val libPath = "$binariesModuleDir/binaries/ios-framework/pdfium.xcframework/$sliceName"
+        framework {
+            this.baseName = "pdfmp"
+            isStatic = false
+        }
+
+        binaries.all {
+            // Link the Static Framework
+            linkerOpts("-L$libPath")
+            linkerOpts("-lpdfium")
+
+            linkerOpts("-lc++")
+            linkerOpts("-framework", "CoreGraphics")
+            linkerOpts("-framework", "CoreText")
+            linkerOpts("-framework", "ImageIO")
+            linkerOpts("-framework", "QuartzCore")
+        }
+    }
+}
 
 kotlin {
     applyDefaultHierarchyTemplate {
@@ -122,9 +163,9 @@ kotlin {
     macosX64 { setUpPdfiumCinterop(); setupSharedLib() }
 
     // iOS Targets
-    iosArm64 { setUpPdfiumCinterop(); setupSharedLib() }
-    iosSimulatorArm64 { setUpPdfiumCinterop(); setupSharedLib() }
-    iosX64 { setUpPdfiumCinterop(); setupSharedLib() }
+    iosArm64 { setUpPdfiumCinterop(); setupSharedLib(); setupIosFramework() }
+    iosSimulatorArm64 { setUpPdfiumCinterop(); setupSharedLib(); setupIosFramework() }
+    iosX64 { setUpPdfiumCinterop(); setupSharedLib(); setupIosFramework() }
 
     sourceSets {
         commonMain.dependencies {
@@ -136,20 +177,26 @@ kotlin {
                 implementation(libs.jni.annotations)
             }
         }
-        jvmMain.dependencies {
-            implementation(libs.skiko)
+        getByName("consumerMain").dependencies {
+//            implementation(libs.skiko)
         }
         getByName("androidNativeMain").dependsOn(getByName("nativeJniMain"))
-
-        getByName("consumerMain") {
-            dependsOn(getByName("commonMain"))
+        getByName("consumerNativeMain").dependsOn(getByName("nativeMain"))
+        val nonAndroidConsumer = create("nonAndroidConsumerMain")
+        nonAndroidConsumer.dependsOn(getByName("consumerMain"))
+        getByName("jvmMain").dependsOn(nonAndroidConsumer)
+        getByName("iosMain").dependsOn(nonAndroidConsumer)
+        nonAndroidConsumer.dependencies {
+            implementation(libs.skiko)
         }
+
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
     }
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
+        optIn.add("kotlinx.cinterop.ExperimentalForeignApi")
     }
 }
 

@@ -24,6 +24,7 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,10 +41,10 @@ import com.dshatz.pdfmp.compose.source.asyncPdfResource
 import com.dshatz.pdfmp.compose.state.DisplayState
 import com.dshatz.pdfmp.compose.state.rememberPdfState
 import com.dshatz.pdfmp.compose.state.zoomPercents
+import com.dshatz.pdfmp.sample.Res
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.coroutines.launch
 import kotlinx.io.files.Path
-import pdf_multiplatform.sample_shared.generated.resources.Res
 import kotlin.math.roundToInt
 
 @Composable

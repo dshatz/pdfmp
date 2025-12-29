@@ -11,7 +11,8 @@ import SwiftUI
 struct pdfmpApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+//            ContentView()
+            SampleViewController()
         }
     }
 }

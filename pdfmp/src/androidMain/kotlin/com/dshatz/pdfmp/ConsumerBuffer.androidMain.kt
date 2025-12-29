@@ -9,34 +9,34 @@ import com.dshatz.pdfmp.model.SizeB
 actual class ConsumerBuffer(
     val androidBitmap: Bitmap,
     val bufferInfo: BufferInfo,
-) {
+): IConsumerBuffer {
 
-    actual val dimensions: BufferDimensions = bufferInfo.dimensions
+    actual override val dimensions: BufferDimensions = bufferInfo.dimensions
 
-    actual fun <T> withAddress(action: (Long) -> T): T {
+    actual override fun <T> withAddress(action: (Long) -> T): T {
         return action(bufferInfo.address)
     }
 
-    actual fun capacity(): SizeB {
+    actual override fun capacity(): SizeB {
         return SizeB(androidBitmap.byteCount.toLong())
     }
 
 
-    actual fun free() {
+    actual override fun free() {
         _isFree = true
         // Do not unlock the bitmap here as this buffer will be reused by ConsumerBufferPool.
     }
 
-    actual fun dispose() {
+    actual override fun dispose() {
         ConsumerBufferUtil.unlockBitmap(androidBitmap)
         androidBitmap.recycle()
     }
 
     private var _isFree = true
-    actual val isFree: Boolean get() = _isFree
+    actual override val isFree: Boolean get() = _isFree
 
 
-    actual fun setUnfree() {
+    actual override fun setUnfree() {
         _isFree = false
     }
 }

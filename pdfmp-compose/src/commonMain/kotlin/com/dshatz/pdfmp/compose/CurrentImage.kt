@@ -3,7 +3,6 @@ package com.dshatz.pdfmp.compose
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.graphics.ImageBitmap
 import com.dshatz.pdfmp.ConsumerBuffer
 import com.dshatz.pdfmp.compose.tools.RecyclableBitmap
 import com.dshatz.pdfmp.compose.tools.toImageBitmap

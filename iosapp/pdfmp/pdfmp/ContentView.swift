@@ -6,10 +6,11 @@
 //
 
 import SwiftUI
+import pdfmpcompose
 
 struct SampleViewController: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
-        return Main_iosKt.SampleViewController()
+        return pdfmpcompose.SampleViewControllerKt.SampleViewController();
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {

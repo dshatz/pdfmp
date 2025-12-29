@@ -16,7 +16,6 @@ import com.dshatz.pdfmp.model.RenderResponse
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlin.math.floor
 import kotlin.math.min
 import kotlin.time.ExperimentalTime
 
@@ -408,15 +407,18 @@ data class PdfState(
     internal fun OpenDisposableDocument() {
         InitLib().init()
         DisposableEffect(pdfSource) {
-            renderer = PdfRenderer(pdfSource)
-            bufferPool = ConsumerBufferPool()
-            val initResult = initPages(renderer)
-            val error = initResult.exceptionOrNull()
-            if (error != null) {
-                this@PdfState.error.value = error
-            } else {
+            val rendererResult = PdfRendererFactory.createFromSource(pdfSource)
+            rendererResult.mapCatching { renderer ->
+                this@PdfState.renderer = renderer
+                bufferPool = ConsumerBufferPool()
+            }.onFailure {
+                d("Failed to open document: $it")
+                this@PdfState.error.value = it
+            }.onSuccess {
+                initPages(renderer).getOrThrow()
                 isInitialized.value = true
             }
+
             onDispose {
                 isInitialized.value = false
                 renderer.close()

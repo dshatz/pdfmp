@@ -1,6 +1,7 @@
-@file:OptIn(ExperimentalComposeLibrary::class)
+@file:OptIn(ExperimentalComposeLibrary::class, ExperimentalKotlinGradlePluginApi::class)
 
 import org.jetbrains.compose.ExperimentalComposeLibrary
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
@@ -14,6 +15,15 @@ plugins {
 version = project.findProperty("version") as? String ?: "0.1.0-SNAPSHOT1"
 
 kotlin {
+    applyDefaultHierarchyTemplate {
+        common {
+            group("nonAndroid") {
+                withIos()
+                withJvm()
+            }
+            withAndroidTarget()
+        }
+    }
     jvmToolchain(21)
     androidTarget()
     jvm()
@@ -24,6 +34,7 @@ kotlin {
     iosTargets.forEach {
         it.binaries.framework {
             baseName = "pdfmpcompose"
+            export(project(":pdfmp"))
             xcf.add(this)
         }
     }

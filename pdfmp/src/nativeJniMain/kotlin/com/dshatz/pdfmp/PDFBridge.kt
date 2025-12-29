@@ -48,15 +48,14 @@ fun getPageCount(renderer: PdfRendererPtr): ByteArray {
 @JNIConnect(
     packageName = PACKAGE_NAME,
     className = CLASS_NAME,
-    functionName = "openFile"
+    functionName = "createNativeRenderer"
 )
-fun openFile(packedSource: ByteArray): ByteArray {
-    val renderer = PdfRenderer(PdfSource.unpack(packedSource))
-    val result = renderer.openFile().map {
+fun createNativeRenderer(packedSource: ByteArray): ByteArray {
+    val initResult = PdfRendererFactory.createFromSource(PdfSource.unpack(packedSource)).mapCatching { renderer ->
         val stableRef = StableRef.create(renderer)
         stableRef.asCPointer().toLong()
     }
-    return returnResult(result, Buffer::writeLong)
+    return returnResult(initResult, Buffer::writeLong)
 }
 
 @JNIConnect(
@@ -99,16 +98,6 @@ fun render(renderer: PdfRendererPtr, reqBytes: ByteArray): ByteArray {
 fun close(renderer: PdfRendererPtr) {
     renderer.getRenderer().close()
 }
-
-/*@OptIn(ExperimentalNativeApi::class)
-@CName("Java_com_dshatz_pdfmp_${CLASS_NAME}_getBufferAddress")
-public fun _getBufferAddress(
-    env: CPointer<JNIEnvVar>,
-    clazz: jobject,
-    buffer: jobject,
-): jlong {
-    return buffer.toLong()
-}*/
 
 fun PdfRendererPtr.getRenderer(): PdfRenderer {
     return runCatching {

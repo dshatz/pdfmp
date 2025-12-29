@@ -23,7 +23,7 @@ jni-annotations = { module = "dev.datlag.nkommons:annotations", version.ref = "j
 io = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version = "0.8.0" }
 
 # For zero-copy bitmap on desktop.
-skiko = { module = "org.jetbrains.skiko:skiko-awt", version = "0.9.22.2" }
+skiko = { module = "org.jetbrains.skiko:skiko", version = "0.9.22.2" }
 
 coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.10.2" }
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version = "1.10.2" }

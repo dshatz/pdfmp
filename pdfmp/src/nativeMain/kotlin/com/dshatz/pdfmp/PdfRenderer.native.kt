@@ -13,7 +13,7 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.cinterop.*
 
 @OptIn(ExperimentalForeignApi::class)
-actual class PdfRenderer actual constructor(private val source: PdfSource): SynchronizedObject() {
+actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
 
     private var doc: CPointer<fpdf_document_t__>? = null
     private var pinnedData: Pinned<ByteArray>? = null
@@ -209,3 +209,9 @@ actual class PdfRenderer actual constructor(private val source: PdfSource): Sync
     }
 }
 
+actual object PdfRendererFactory {
+    actual fun createFromSource(source: PdfSource): Result<PdfRenderer> {
+        val renderer = PdfRenderer(source)
+        return renderer.openFile().map { renderer }
+    }
+}

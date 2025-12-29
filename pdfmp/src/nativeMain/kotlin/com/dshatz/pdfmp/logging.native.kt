@@ -4,6 +4,3 @@ import kotlin.experimental.ExperimentalNativeApi
 
 @OptIn(ExperimentalNativeApi::class)
 actual fun isDebug() = Platform.isDebugBinary
-internal actual fun logPlatform(level: LogLevel, tag: String, message: String) {
-    logUsingPrintln(level, tag, message)
-}

@@ -22,12 +22,13 @@ kotlin {
         it.binaries.framework {
             baseName = "pdfmpcompose"
             xcf.add(this)
+            export(project(":pdfmp-compose"))
         }
     }
 
     sourceSets {
         commonMain.dependencies {
-            implementation(project(":pdfmp-compose"))
+            api(project(":pdfmp-compose"))
             implementation(compose.runtime)
             implementation(compose.material3)
             implementation(compose.components.resources)
@@ -42,4 +43,8 @@ android {
     defaultConfig {
         minSdk = 24
     }
+}
+
+compose.resources {
+    packageOfResClass = "com.dshatz.pdfmp.sample"
 }

@@ -30,7 +30,6 @@ import com.dshatz.pdfmp.compose.platformModifier.platformScrollableModifier
 import com.dshatz.pdfmp.compose.state.PdfState
 import com.dshatz.pdfmp.compose.tools.TransformedBitmapRenderer
 import com.dshatz.pdfmp.compose.tools.pageTransformModifier
-import com.dshatz.pdfmp.compose.tools.toImageBitmap
 import com.dshatz.pdfmp.model.calculateSize
 import kotlinx.coroutines.delay
 
