@@ -210,7 +210,7 @@ actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
 }
 
 actual object PdfRendererFactory {
-    actual fun createFromSource(source: PdfSource): Result<PdfRenderer> {
+    actual suspend fun createFromSource(source: PdfSource): Result<PdfRenderer> {
         val renderer = PdfRenderer(source)
         return renderer.openFile().map { renderer }
     }

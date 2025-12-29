@@ -14,6 +14,7 @@ import kotlinx.cinterop.StableRef
 import kotlinx.cinterop.asStableRef
 import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toLong
+import kotlinx.coroutines.runBlocking
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 
@@ -51,9 +52,11 @@ fun getPageCount(renderer: PdfRendererPtr): ByteArray {
     functionName = "createNativeRenderer"
 )
 fun createNativeRenderer(packedSource: ByteArray): ByteArray {
-    val initResult = PdfRendererFactory.createFromSource(PdfSource.unpack(packedSource)).mapCatching { renderer ->
-        val stableRef = StableRef.create(renderer)
-        stableRef.asCPointer().toLong()
+    val initResult = runBlocking {
+        PdfRendererFactory.createFromSource(PdfSource.unpack(packedSource)).mapCatching { renderer ->
+            val stableRef = StableRef.create(renderer)
+            stableRef.asCPointer().toLong()
+        }
     }
     return returnResult(initResult, Buffer::writeLong)
 }

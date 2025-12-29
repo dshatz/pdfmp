@@ -36,7 +36,7 @@ actual class PdfRenderer(private val renderer: PdfRendererPtr) {
 }
 
 actual object PdfRendererFactory {
-    actual fun createFromSource(
+    actual suspend fun createFromSource(
         source: PdfSource,
     ): Result<PdfRenderer> {
         val nativePtr: Result<PdfRendererPtr> = unpackResult(PDFBridge.createNativeRenderer(source.pack()), Buffer::readLong)

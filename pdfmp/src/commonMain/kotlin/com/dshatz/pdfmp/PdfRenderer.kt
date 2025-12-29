@@ -12,5 +12,5 @@ expect class PdfRenderer {
 }
 
 expect object PdfRendererFactory {
-    fun createFromSource(source: PdfSource): Result<PdfRenderer>
+    suspend fun createFromSource(source: PdfSource): Result<PdfRenderer>
 }

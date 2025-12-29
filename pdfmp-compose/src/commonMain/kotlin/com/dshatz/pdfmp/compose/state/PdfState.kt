@@ -17,7 +17,10 @@ import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.model.RenderResponse
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.min
 import kotlin.time.ExperimentalTime
 
@@ -412,20 +415,23 @@ data class PdfState(
     @Composable
     internal fun OpenDisposableDocument() {
         InitLib().init()
-        DisposableEffect(pdfSource) {
-            val rendererResult = PdfRendererFactory.createFromSource(pdfSource)
-            rendererResult.mapCatching { renderer ->
-                this@PdfState.renderer = renderer
-                bufferPool = ConsumerBufferPool()
-            }.onFailure {
-                d("Failed to open document: $it")
-                this@PdfState.error.value = it
-            }.onSuccess {
-                initPages(renderer).getOrThrow()
-                isInitialized.value = true
-            }
-
-            onDispose {
+        LaunchedEffect(pdfSource) {
+            try {
+                withContext(Dispatchers.Default) {
+                    val rendererResult = PdfRendererFactory.createFromSource(pdfSource)
+                    rendererResult.mapCatching { renderer ->
+                        this@PdfState.renderer = renderer
+                        bufferPool = ConsumerBufferPool()
+                    }.onFailure {
+                        d("Failed to open document: $it")
+                        this@PdfState.error.value = it
+                    }.onSuccess {
+                        initPages(renderer).getOrThrow()
+                        isInitialized.value = true
+                    }
+                }
+                awaitCancellation()
+            } finally {
                 isInitialized.value = false
                 if (this@PdfState::renderer.isInitialized) {
                     renderer.close()

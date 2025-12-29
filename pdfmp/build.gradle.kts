@@ -170,6 +170,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(libs.io)
+            implementation(libs.coroutines)
         }
         getByName("nativeJniMain") {
             dependencies {
