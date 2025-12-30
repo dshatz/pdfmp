@@ -15,3 +15,6 @@ value class SizeB(val bytes: Long): Comparable<SizeB> {
         val ZERO = SizeB(0)
     }
 }
+
+val Long.bytes get() = SizeB(this)
+val Int.bytes get() = SizeB(this.toLong())

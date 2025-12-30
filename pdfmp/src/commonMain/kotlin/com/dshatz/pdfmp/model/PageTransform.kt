@@ -21,19 +21,8 @@ data class PageTransform(
         return scaledWidth - leftCutoff - rightCutoff to scaledHeight - topCutoff - bottomCutoff
     }
 
-    fun sliceSizeWithGap(): Pair<Int, Int> {
-        return sliceSize().let {
-            it.first to it.second + topGap
-        }
-    }
-
     val bufferSize: SizeB get() {
         val (width, height) = sliceSize()
-        return SizeB(width * height * 4L)
-    }
-
-    val bufferSizeWithGap: SizeB get() {
-        val (width, height) = sliceSizeWithGap()
         return SizeB(width * height * 4L)
     }
 

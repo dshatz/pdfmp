@@ -1,48 +1,31 @@
 package com.dshatz.pdfmp
 
 import com.dshatz.pdfmp.model.BufferDimensions
-import com.dshatz.pdfmp.model.BufferInfo
 import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.RenderRequest
+import io.kotest.assertions.throwables.shouldNotThrow
+import io.kotest.assertions.throwables.shouldNotThrowAny
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.core.spec.style.ShouldSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlin.random.Random
-import kotlin.test.Test
-import kotlin.test.assertContains
-import kotlin.test.assertEquals
-import kotlin.test.assertFails
-import kotlin.test.fail
 
-class PackTest {
+class PackTest: ShouldSpec({
 
-    private fun randomPageTransform(): PageTransform {
-        return PageTransform(
-            Random.nextInt(),
-            Random.nextInt(),
-            Random.nextInt(),
-            Random.nextInt(),
-            Random.nextInt(),
-            Random.nextInt(),
-            Random.nextInt(),
-            Random.nextInt(),
-            Random.nextFloat()
-        )
-    }
-
-    @Test
-    fun `pack page transform`() {
+    should("pack page transform") {
         val input = randomPageTransform()
         val buffer = Buffer()
         input.pack(buffer)
 
-        assertEquals(
-            input,
-            PageTransform.unpack(buffer.copy())
-        )
+        PageTransform.unpack(buffer.copy()) shouldBe input
     }
 
-    @Test
-    fun `pack render request`() {
+    should("pack render request") {
         val input = RenderRequest(
             transforms = generateSequence { randomPageTransform() }.take(Random.nextInt(10)).toList(),
             0,
@@ -54,30 +37,52 @@ class PackTest {
             ).withAddress(1),
         )
         val bytes = input.pack()
-        assertEquals(
-            input,
-            RenderRequest.unpack(bytes)
-        )
+        RenderRequest.unpack(bytes) shouldBe input
     }
 
-    @Test
-    fun `pack failure`() {
+
+    should("pack failure throwing") {
         val result = Result.failure<Unit>(RuntimeException("native message"))
         val buffer = Buffer()
         result.pack(buffer, {})
 
-        val exception = assertFails {
+        val exception = shouldThrow<Exception> {
             unpackResultOrThrow(buffer.readByteArray(), {})
         }
-        assertContains(exception.message.orEmpty(), "native message")
+        exception.message shouldContain "native message"
     }
 
-    @Test
-    fun `pack success`() {
+    should("pack failure") {
+        val result = Result.failure<Unit>(RuntimeException("native message"))
+        val buffer = Buffer()
+        result.pack(buffer, {})
+
+        val exception = shouldNotThrowAny {
+            unpackResult(buffer.readByteArray(), {})
+        }.exceptionOrNull()
+        exception shouldNotBe null
+        exception!!.message shouldContain "native message"
+    }
+
+    should("pack success") {
         val result = Result.success<Int>(999)
         val buffer = Buffer()
         result.pack(buffer, Buffer::writeInt)
 
-        assertEquals(999, unpackResultOrThrow(buffer.readByteArray(), Buffer::readInt))
+        unpackResultOrThrow(buffer.readByteArray(), Buffer::readInt) shouldBe 999
     }
+})
+
+private fun randomPageTransform(): PageTransform {
+    return PageTransform(
+        Random.nextInt(),
+        Random.nextInt(),
+        Random.nextInt(),
+        Random.nextInt(),
+        Random.nextInt(),
+        Random.nextInt(),
+        Random.nextInt(),
+        Random.nextInt(),
+        Random.nextFloat()
+    )
 }

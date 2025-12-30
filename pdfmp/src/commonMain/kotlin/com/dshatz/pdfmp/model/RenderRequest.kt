@@ -2,9 +2,7 @@ package com.dshatz.pdfmp.model
 
 import com.dshatz.pdfmp.model.BufferInfo.Companion.pack
 import com.dshatz.pdfmp.packList
-import com.dshatz.pdfmp.packMap
 import com.dshatz.pdfmp.unpackList
-import com.dshatz.pdfmp.unpackMap
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 

@@ -455,19 +455,19 @@ data class VisiblePageInfo(
     /**
      * How much of the page (px) is above the top of the viewport.
      */
-    val topCutoff: Float,
+    val topCutoff: Float = 0f,
     /**
      * How much of the page (px) is below the bottom of the viewport.
      */
-    val bottomCutoff: Float,
+    val bottomCutoff: Float = 0f,
     /**
      * How much of the page (px) is more left than the left edge of the viewport.
      */
-    val leftCutoff: Int,
+    val leftCutoff: Int = 0,
     /**
      * How much of the page (px) is more right than the right edge of the viewport.
      */
-    val rightCutoff: Int,
+    val rightCutoff: Int = 0,
     /**
      * Scaled width of the page in pixels. Can be wider than viewport.
      */
