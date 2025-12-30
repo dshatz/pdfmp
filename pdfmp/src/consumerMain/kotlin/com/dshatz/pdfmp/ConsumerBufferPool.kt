@@ -6,8 +6,8 @@ import com.dshatz.pdfmp.model.calculateSize
 
 class ConsumerBufferPool {
 
-    private val buffers: LinkedHashSet<ConsumerBuffer> = linkedSetOf()
-    private var bufferViewport: ConsumerBuffer? = null
+    internal val buffers: LinkedHashSet<ConsumerBuffer> = linkedSetOf()
+    internal var bufferViewport: ConsumerBuffer? = null
 
     fun getBufferPage(transform: PageTransform): ConsumerBuffer {
         val neededCapacity = transform.bufferSize
@@ -49,9 +49,9 @@ class ConsumerBufferPool {
         }
     }
 
-    private val totalBufferMemory: SizeB
+    internal val totalBufferMemory: SizeB
         get() = buffers.fold(SizeB.ZERO) { s, buffer -> s + buffer.capacity() }
 
-    private val totalUnfreeBufferMemory: SizeB
+    internal val totalUnfreeBufferMemory: SizeB
         get() = buffers.filter { !it.isFree }.fold(SizeB.ZERO) { s, buffer -> s + buffer.capacity() }
 }

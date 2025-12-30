@@ -2,6 +2,7 @@ package com.dshatz.pdfmp
 
 import cnames.structs.fpdf_document_t__
 import com.dshatz.internal.pdfium.*
+import com.dshatz.pdfmp.error.FileError
 import com.dshatz.pdfmp.error.PdfiumException
 import com.dshatz.pdfmp.model.BufferDimensions
 import com.dshatz.pdfmp.model.PageTransform
@@ -36,7 +37,11 @@ actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
                         null
                     )
                 }
-                is PdfSource.PdfPath -> FPDF_LoadDocument(source.path.toString(), null)
+                is PdfSource.PdfPath -> {
+                    if (checkFilePath(source.path)) {
+                        FPDF_LoadDocument(source.path.toString(), null)
+                    } else throw FileError()
+                }
             }
             if (doc == null || doc.rawValue == nativeNullPtr) {
                 val pdfErrorCode = FPDF_GetLastError().toByte()

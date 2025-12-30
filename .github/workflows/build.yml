@@ -10,16 +10,125 @@ on:
       - main
       - develop
   release:
-    types: [created]  # Triggers publishing when a release is created
+    types: [created]
 
 permissions:
   contents: read
   checks: write
   pull-requests: write
-  packages: write  # Required for publishing to GitHub Packages
+  packages: write
 
 jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ macos-latest, ubuntu-latest, windows-latest ]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Run Tests Linux
+        if: runner.os == 'Linux'
+        run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=linuxX64
+
+      - name: Run Tests Windows
+        if: runner.os == 'Windows'
+        run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=mingwX64
+
+      - name: Run Tests MacOS
+        if: runner.os == 'macOS'
+        run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=iosSimulatorArm64,macosArm64
+
+      - name: Upload Test Results (macOS)
+        if: runner.os == 'macOS' # Upload macos and ios separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-macos
+          path: |
+            **/build/test-results/macos*Test/*.xml
+            **/build/test-results/jvmTest/*.xml
+      - name: Upload Test Results (iOS)
+        if: runner.os == 'macOS' # Upload macos and ios separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-ios
+          path: '**/build/test-results/ios*Test/*.xml'
+      - name: Upload Test Results (non-apple)
+        if: runner.os != 'macOS' # Upload macos and ios separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ matrix.os }}
+          path: '**/build/test-results/**/*.xml'
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.os }}
+          path: '**/build/jacocoReports/jacocoTestReport/jacocoTestReport.xml'
+
+  publish-test-results:
+    name: "Publish Tests Results"
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+      issues: read
+    if: (!cancelled())
+
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish Linux Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: "artifacts/test-report-ubuntu-latest/**/*.xml"
+          check_name: Linux X64
+      - name: Publish Windows Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: "artifacts/test-report-windows-latest/**/*.xml"
+          check_name: Windows X64
+
+      - name: Publish MacOS Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: "artifacts/test-report-macos/**/*.xml"
+          check_name: MacOS ARM
+      - name: Publish MacOS Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: "artifacts/test-report-ios/**/*.xml"
+          check_name: iOS ARM
+      - name: Add coverage to PR
+        id: jacoco
+        uses: madrapps/jacoco-report@v1.7.2
+        with:
+          paths: |
+            artifacts/coverage-report-ubuntu-latest/**/*.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          update-comment: true
+          comment-type: both
+          title: "Test coverage"
+
   publish:
+    needs: test # Only publish if tests pass
     if: github.event_name == 'release'
     runs-on: macos-latest
 
@@ -27,18 +136,21 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: 2. Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: false
+
       - id: get_version
         name: Get version
         uses: jannemattila/get-version-from-tag@v4
+
       - name: Publish to Maven Repository
         run: |
           VERSION=$(echo "${{ steps.get_version.outputs.version }}")

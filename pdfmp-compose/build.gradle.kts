@@ -1,5 +1,6 @@
 @file:OptIn(ExperimentalComposeLibrary::class, ExperimentalKotlinGradlePluginApi::class)
 
+import com.dshatz.pdfmp.buildlogic.configureTests
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
@@ -8,8 +9,11 @@ plugins {
     alias(libs.plugins.mp)
     alias(libs.plugins.compose)
     alias(libs.plugins.compose.kt)
+    alias(libs.plugins.kotest)
+    alias(libs.plugins.ksp) // for kotest
     alias(libs.plugins.android.lib)
     alias(libs.plugins.publish)
+    jacoco
 }
 
 version = project.findProperty("version") as? String ?: "0.1.0-SNAPSHOT1"
@@ -47,15 +51,18 @@ kotlin {
             implementation(compose.foundation)
         }
         commonTest.dependencies {
-            implementation(kotlin("test"))
             implementation(libs.coroutines.test)
             implementation(compose.uiTest)
+            implementation(libs.kotest)
+            implementation(libs.kotest.assertions)
         }
         jvmTest.dependencies {
             implementation(libs.coroutines.test)
             implementation("io.mockk:mockk:1.14.6")
+            implementation(libs.kotest.junit5)
         }
     }
+    configureTests(this)
 }
 
 android {
@@ -97,4 +104,9 @@ mavenPublishing {
             developerConnection.set("scm:git:ssh://git@github.com/dshatz/pdfmp.git")
         }
     }
+}
+
+jacoco {
+    toolVersion = "0.8.14"
+    reportsDirectory = layout.buildDirectory.dir("jacocoReports")
 }

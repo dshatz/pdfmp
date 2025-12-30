@@ -1,5 +1,6 @@
 pluginManagement {
     repositories {
+        gradlePluginPortal()
         mavenCentral()
         google()
     }
@@ -11,6 +12,7 @@ dependencyResolutionManagement {
         google()
     }
 }
+includeBuild("build-logic")
 include(":pdfmp")
 include(":pdfmp-compose")
 include(":sample")

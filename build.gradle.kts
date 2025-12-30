@@ -5,3 +5,9 @@ plugins {
     alias(libs.plugins.android.app) apply false
     alias(libs.plugins.publish) apply false
 }
+
+buildscript {
+    dependencies {
+        classpath("com.dshatz.pdfmp.buildlogic:build-logic")
+    }
+}
