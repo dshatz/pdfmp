@@ -330,26 +330,20 @@ android {
 }
 
 
-val generateNativeResources by tasks.registering(Sync::class) {
+fun registerNativeResources(taskName: String, buildType: String) = tasks.register<Sync>(taskName) {
     group = "build"
-    description = "Copies native libraries to the build directory to be included as resources"
-
-    // Output everything to build/generated/native-libs
-    val outputDir = layout.buildDirectory.dir("generated/native-libs")
+    val outputDir = layout.buildDirectory.dir("generated/native-libs/$buildType")
     into(outputDir)
 
-    // Handle duplicates just in case
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     desktopTargetMap.forEach { (targetName, resourcePath) ->
         val target = kotlin.targets.findByName(targetName) as? org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-        if (targetName !in nativeTargets) return@forEach
-        if (target != null) {
-            val sharedLib = target.binaries.findSharedLib("release")
+        if (targetName in nativeTargets && target != null) {
+            val sharedLib = target.binaries.findSharedLib(buildType)
             if (sharedLib != null) {
                 dependsOn(sharedLib.linkTaskProvider)
                 from(sharedLib.outputFile) {
-                    // Note: This creates the structure inside the generated folder
                     into("lib/$resourcePath")
                 }
             }
@@ -365,8 +359,19 @@ val generateNativeResources by tasks.registering(Sync::class) {
     }
 }
 
-kotlin.sourceSets.getByName("jvmMain") {
-    resources.srcDir(generateNativeResources)
+val generateDebugResources = registerNativeResources("generateDebugNativeResources", "debug")
+val generateReleaseResources = registerNativeResources("generateReleaseNativeResources", "release")
+
+kotlin.sourceSets.getByName("jvmTest") {
+    resources.srcDir(generateDebugResources)
+}
+
+tasks.named<Jar>("jvmJar") {
+    from(generateReleaseResources)
+}
+
+tasks.withType<JavaExec>().configureEach {
+    classpath += files(generateDebugResources)
 }
 
 dependencies {
