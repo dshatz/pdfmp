@@ -118,14 +118,26 @@ jobs:
           check_name: iOS ARM
       - name: Add coverage to PR
         id: jacoco
-        uses: madrapps/jacoco-report@v1.7.2
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.5.1
         with:
-          paths: |
+          reports: |
             artifacts/coverage-report-ubuntu-latest/**/*.xml
-          token: ${{ secrets.GITHUB_TOKEN }}
-          update-comment: true
-          comment-type: both
-          title: "Test coverage"
+          targetdir: "coveragereport"
+          reporttypes: 'Badges;MarkdownSummaryGithub'
+      - name: Upload coverage report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CoverageReport
+          path: coveragereport
+      - name: Add comment to PR
+        if: github.event_name == 'pull_request'
+        run: gh pr comment $PR_NUMBER --edit-last --create-if-none --body-file coveragereport/SummaryGithub.md # Adjust path and filename if necessary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.number }}
+      - name: Publish coverage in build summary
+        run: cat coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
+        shell: bash
 
   publish:
     needs: test # Only publish if tests pass

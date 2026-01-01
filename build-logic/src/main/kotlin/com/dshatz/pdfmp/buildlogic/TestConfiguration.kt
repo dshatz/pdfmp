@@ -43,7 +43,7 @@ fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
 
     tasks.register("jacocoTestReport", JacocoReport::class) {
         dependsOn("jvmTest")
-        val coverageSourceDirs = kotlin.sourceSets.filter { it.name.endsWith("Main") }.map { "src/${it.name}" }
+        val coverageSourceDirs = kotlin.sourceSets.filter { it.name.endsWith("Main") }.map { "src/${it.name}/kotlin" }
 
         val buildDirectory = layout.buildDirectory
 
