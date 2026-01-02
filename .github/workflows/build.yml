@@ -132,7 +132,7 @@ jobs:
       - name: Create comment
         uses: peter-evans/create-or-update-comment@v5
         with:
-          issue-number: 1
+          issue-number: ${{ github.event.pull_request.number }}
           body-path: coveragereport/SummaryGithub.md
       - name: Publish coverage in build summary
         run: cat coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
