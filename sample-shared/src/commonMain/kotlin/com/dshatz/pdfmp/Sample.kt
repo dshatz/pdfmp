@@ -4,27 +4,24 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowCircleUp
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material.icons.outlined.Clear
-import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -134,7 +131,7 @@ private fun FullDoc() {
 
         // This is how to observe current document state.
         val zoom by pdf.zoomPercents()
-        val scrollState by pdf.layoutInfo()
+        val layoutInfo by pdf.layoutInfo()
 
         Box {
             PdfView(
@@ -144,20 +141,21 @@ private fun FullDoc() {
 
             val scope = rememberCoroutineScope()
 
-            scrollState?.let { scrollState ->
+            layoutInfo?.let { layoutInfo ->
+                Scrollbar(layoutInfo, modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight())
                 ElevatedCard(
                     Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp)
                 ) {
                     val mostVisiblePageIdx by derivedStateOf {
-                        scrollState.mostVisiblePage.value?.pageIdx ?: 0
+                        layoutInfo.mostVisiblePage.value?.pageIdx ?: 0
                     }
-                    Text("Page ${mostVisiblePageIdx + 1} / ${scrollState.totalPages.value} (Zoom $zoom%)", fontSize = 24.sp, modifier = Modifier.padding(5.dp))
-                    Text("Vertical scroll ${scrollState.offsetY.roundToInt()}/${scrollState.documentHeight.value.roundToInt()}", fontSize = 20.sp)
+                    Text("Page ${mostVisiblePageIdx + 1} / ${layoutInfo.totalPages.value} (Zoom $zoom%)", fontSize = 24.sp, modifier = Modifier.padding(5.dp))
+                    Text("Vertical scroll ${layoutInfo.offsetY.roundToInt()}/${layoutInfo.documentHeight.value.roundToInt()}", fontSize = 20.sp)
                     Column {
                         OutlinedIconButton(
                             onClick = {
                                 scope.launch {
-                                    scrollState.animateScrollTo(scrollState.pageRange.value.first)
+                                    layoutInfo.animateScrollTo(layoutInfo.pageRange.value.first)
                                 }
                             }
                         ) {
@@ -167,7 +165,7 @@ private fun FullDoc() {
                         OutlinedIconButton(
                             onClick = {
                                 scope.launch {
-                                    scrollState.animateScrollTo(scrollState.pageRange.value.last)
+                                    layoutInfo.animateScrollTo(layoutInfo.pageRange.value.last)
                                 }
                             }
                         ) {
@@ -176,11 +174,11 @@ private fun FullDoc() {
                     }
                 }
                 Column(modifier = Modifier.padding(20.dp).align(Alignment.BottomEnd)) {
-                    val zoom by scrollState.zoom
+                    val zoom by layoutInfo.zoom
                     SmallFloatingActionButton(
                         onClick = {
                             scope.launch {
-                                scrollState.animateSetZoom(zoom + 0.2f)
+                                layoutInfo.animateSetZoom(zoom + 0.2f)
                             }
                         }
                     ) {
@@ -190,7 +188,7 @@ private fun FullDoc() {
                     SmallFloatingActionButton(
                         onClick = {
                             scope.launch {
-                                scrollState.animateSetZoom(zoom - 0.2f)
+                                layoutInfo.animateSetZoom(zoom - 0.2f)
                             }
                         }
                     ) {
@@ -200,7 +198,7 @@ private fun FullDoc() {
                     SmallFloatingActionButton(
                         onClick = {
                             scope.launch {
-                                scrollState.animateSetZoom(1f)
+                                layoutInfo.animateSetZoom(1f)
                             }
                         }
                     ) {

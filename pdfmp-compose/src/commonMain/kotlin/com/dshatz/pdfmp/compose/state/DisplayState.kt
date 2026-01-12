@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.geometry.Size
 
 sealed class DisplayState {
     data object Initializing: DisplayState()
@@ -27,7 +28,8 @@ class PdfLayoutInfo internal constructor(
     private val getPageRange: () -> IntRange,
     private val getTotalHeight: () -> Float,
     private val getZoom: () -> Float,
-    private val doZoom: (Float) -> Unit
+    private val doZoom: (Float) -> Unit,
+    private val getViewportSize: () -> Size
 ) {
 
     fun scrollTo(
@@ -41,7 +43,7 @@ class PdfLayoutInfo internal constructor(
      */
     var offsetY: Float
         get() = getOffsetY()
-        private set(value) = setOffsetY(value)
+        set(value) = setOffsetY(value)
 
     private val animatableScroll = Animatable(0f)
     suspend fun animateScrollTo(
@@ -118,5 +120,9 @@ class PdfLayoutInfo internal constructor(
      */
     val zoom = derivedStateOf {
         getZoom()
+    }
+
+    val viewportSize = derivedStateOf {
+        getViewportSize()
     }
 }
