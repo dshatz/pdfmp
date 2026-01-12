@@ -121,7 +121,8 @@ data class PdfState(
         getVisiblePages = { visiblePages.value },
         getPageRange = ::coercedPageRange,
         getZoom = { scale.value },
-        doZoom = ::zoomTowardsCenter
+        doZoom = ::zoomTowardsCenter,
+        getViewportSize = { viewport.value }
     )
 
     /**

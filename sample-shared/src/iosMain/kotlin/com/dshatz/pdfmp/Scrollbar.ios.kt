@@ -5,4 +5,5 @@ import androidx.compose.ui.Modifier
 import com.dshatz.pdfmp.compose.state.PdfLayoutInfo
 
 @Composable
-expect fun Scrollbar(info: PdfLayoutInfo, modifier: Modifier = Modifier)
+actual fun Scrollbar(info: PdfLayoutInfo, modifier: Modifier) {
+}
