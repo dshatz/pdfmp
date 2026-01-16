@@ -24,11 +24,11 @@ This library wraps [libpdfium](https://pdfium.googlesource.com/pdfium/) (the Chr
  ![Maven Central Version](https://img.shields.io/maven-central/v/com.dshatz.pdfmp/pdfmp)
 
  ```kotlin
- implementation("com.dshatz.pdfmp:pdfmp-compose:1.0.8")
+ implementation("com.dshatz.pdfmp:pdfmp-compose:1.0.9")
 ```
 
 ```toml
-pdfmp = { module = "com.dshatz.pdfmp:pdfmp-compose", version = "1.0.8" }
+pdfmp = { module = "com.dshatz.pdfmp:pdfmp-compose", version = "1.0.9" }
 ```
 
 ### Load the pdf
