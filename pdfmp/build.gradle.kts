@@ -316,6 +316,7 @@ android {
     compileSdk = 36
     defaultConfig {
         minSdk = 24
+        consumerProguardFiles(project.file("consumer-rules.pro"))
     }
 
     sourceSets.getByName("main") {
