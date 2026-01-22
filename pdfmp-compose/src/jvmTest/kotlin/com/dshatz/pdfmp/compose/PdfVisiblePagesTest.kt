@@ -172,7 +172,8 @@ private fun getMockedState(
     val scope = CoroutineScope(Dispatchers.Default)
     val renderer = mockk<PdfRenderer>()
     val state = PdfState(PdfSource.PdfPath(Path("")), pageSpacing = gap, scope = scope)
-    every { renderer.getPageRatios() } returns Result.success(generateSequence { pageRatio }.take(pageCount).toList())
+    every { renderer.getPageRatio(any()) } returns Result.success(pageRatio )
+    every { renderer.getPageCount() } returns Result.success(pageCount)
     state.initPages(renderer)
     state.bind(LazyListState(0, 0), ScrollState(0))
 
