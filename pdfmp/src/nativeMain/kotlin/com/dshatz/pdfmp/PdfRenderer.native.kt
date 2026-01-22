@@ -50,6 +50,12 @@ actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
         }
     }
 
+    fun openCustomFile(): Result<Unit> = synchronized(this) {
+        return runCatching {
+
+        }
+    }
+
     @OptIn(UnsafeNumber::class)
     actual suspend fun render(renderRequest: RenderRequest): Result<RenderResponse> = synchronized(this) {
         runCatching {
