@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -31,7 +30,6 @@ import com.dshatz.pdfmp.compose.platformModifier.platformScrollableModifier
 import com.dshatz.pdfmp.compose.state.PdfState
 import com.dshatz.pdfmp.compose.tools.TransformedBitmapRenderer
 import com.dshatz.pdfmp.compose.tools.pageTransformModifier
-import com.dshatz.pdfmp.d
 import com.dshatz.pdfmp.model.calculateSize
 import kotlinx.coroutines.delay
 
@@ -64,7 +62,7 @@ fun PdfView(
                 userScrollEnabled = false,
                 modifier = Modifier.matchParentSize().platformScrollableModifier(state),
             ) {
-                FullDocumentBoxes(state)
+                fullDocumentBoxes(state)
             }
             BaseImage(
                 state,
@@ -79,8 +77,8 @@ fun PdfView(
 }
 
 
-private fun LazyListScope.FullDocumentBoxes(state: PdfState) {
-    state.pages.forEach { (pageIdx, page) ->
+private fun LazyListScope.fullDocumentBoxes(state: PdfState) {
+    state.pages.forEach { (pageIdx, _) ->
         item(pageIdx) {
             val density = LocalDensity.current
             val size by state.rememberScaledPageSize(pageIdx)

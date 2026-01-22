@@ -3,4 +3,4 @@ package com.dshatz.pdfmp
 import kotlin.experimental.ExperimentalNativeApi
 
 @OptIn(ExperimentalNativeApi::class)
-actual fun isDebug() = Platform.isDebugBinary
+actual fun isDebug() = true //Platform.isDebugBinary
