@@ -2,8 +2,10 @@ package com.dshatz.pdfmp
 
 import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.model.RenderResponse
+import com.dshatz.pdfmp.source.CustomSourceDescriptor
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.io.Buffer
+import kotlinx.io.readFloat
 
 actual class PdfRenderer(private val renderer: PdfRendererPtr) {
     
@@ -28,9 +30,9 @@ actual class PdfRenderer(private val renderer: PdfRendererPtr) {
         }
     }
 
-    actual fun getPageRatios(): Result<List<Float>> {
+    actual fun getPageRatio(pageIndex: Int): Result<Float> {
         return runCatching {
-            unpackResult(PDFBridge.getPageRatios(renderer), ::unpackFloats).getOrThrow()
+            unpackResult(PDFBridge.getAspectRatio(renderer, pageIndex), { readFloat() }).getOrThrow()
         }
     }
 }
@@ -39,7 +41,15 @@ actual object PdfRendererFactory {
     actual suspend fun createFromSource(
         source: PdfSource,
     ): Result<PdfRenderer> {
-        val nativePtr: Result<PdfRendererPtr> = unpackResult(PDFBridge.createNativeRenderer(source.pack()), Buffer::readLong)
-        return nativePtr.map { PdfRenderer(it) }
+        return when (source) {
+            is PdfSource.Basic -> {
+                val nativePtr: Result<PdfRendererPtr> = unpackResult(PDFBridge.createNativeRenderer(source.pack()), Buffer::readLong)
+                nativePtr.map { PdfRenderer(it) }
+            }
+            is PdfSource.Custom -> {
+                val nativePtr = unpackResult(PDFBridge.createNativeRendererCustom(source.customSourceDescriptor.jvmCustomSource), Buffer::readLong)
+                nativePtr.map { PdfRenderer(it) }
+            }
+        }
     }
 }

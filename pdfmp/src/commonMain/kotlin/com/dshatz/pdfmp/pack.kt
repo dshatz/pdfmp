@@ -51,6 +51,7 @@ internal fun <T> unpackResultOrThrow(
     return unpackResult(bytes, unpackData).getOrThrow()
 }
 
+@PublishedApi
 internal fun <T> unpackResult(
     bytes: ByteArray,
     unpackData: Buffer.() -> T

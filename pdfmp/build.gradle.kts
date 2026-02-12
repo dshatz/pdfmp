@@ -2,6 +2,8 @@
 
 import com.android.build.gradle.internal.tasks.factory.dependsOn
 import com.dshatz.pdfmp.buildlogic.*
+import com.dshatz.pdfmp.buildlogic.configureTests
+import com.dshatz.pdfmp.buildlogic.nativeTargets
 import org.gradle.internal.extensions.stdlib.capitalized
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
@@ -43,7 +45,7 @@ fun KotlinNativeTarget.setUpPdfiumCinterop() {
     compilations.getByName("main").cinterops {
         create("pdfium") {
             val binariesModuleDir = rootProject.project("pdfium-binaries").projectDir
-            val platformFolder = when (targetName) {
+            val iosDir = when (targetName) {
                 "iosArm64" -> "ios-arm64"
                 "iosX64", "iosSimulatorArm64" -> "ios-arm64_x86_64-simulator"
                 else -> null // Skip unsupported ios native targets
@@ -54,8 +56,8 @@ fun KotlinNativeTarget.setUpPdfiumCinterop() {
             packageName("com.dshatz.internal.pdfium")
 
             // ios only
-            if (platformFolder != null) {
-                val libPath = "$binariesModuleDir/binaries/ios-framework/pdfium.xcframework/$platformFolder"
+            if (iosDir != null) {
+                val libPath = "$binariesModuleDir/binaries/ios-framework/pdfium.xcframework/$iosDir"
                 extraOpts("-staticLibrary", "libpdfium.a", "-libraryPath", libPath)
             }
         }
@@ -156,7 +158,9 @@ kotlin {
                     }
                     withAndroidNative()
                 }
-                withIos()
+                group("nativeNonJni") {
+                    withIos()
+                }
             }
         }
     }
@@ -213,11 +217,12 @@ kotlin {
         commonMain.dependencies {
             api(libs.io)
             implementation(libs.coroutines)
+            implementation(libs.jni.annotations)
+            implementation(libs.jni.buffers)
         }
         getByName("nativeJniMain") {
             dependencies {
                 implementation(libs.jni)
-                implementation(libs.jni.annotations)
             }
         }
         configureOptional("androidNativeMain") {
@@ -268,6 +273,11 @@ kotlin {
                 else -> "x64"
             }
             implementation("org.jetbrains.skiko:skiko-awt-runtime-$targetOs-$targetArch:$skikoVersion")
+        }
+        val nativeJniMain by getting {
+            dependencies {
+//                implementation(project(":native-tools"))
+            }
         }
     }
     compilerOptions {

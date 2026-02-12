@@ -1,10 +1,9 @@
 package com.dshatz.pdfmp.compose.state
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalDensity
@@ -15,13 +14,10 @@ import com.dshatz.pdfmp.*
 import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.model.RenderResponse
+import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
+import com.dshatz.pdfmp.source.CustomSourceDescriptor
 import com.dshatz.pdfmp.source.PdfSource
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import kotlin.math.min
 import kotlin.time.ExperimentalTime
 
@@ -36,6 +32,19 @@ fun rememberPdfState(
     val state = remember { PdfState(pdfSource, pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
     state.OpenDisposableDocument()
     return state
+}
+
+@Composable
+fun rememberPdfState(
+    customPdfSourceAdapter: CustomPdfSourceAdapter,
+    pageRange: IntRange = 0..Int.MAX_VALUE,
+    pageSpacing: Dp = 0.dp
+): PdfState {
+    return rememberPdfState(
+        pdfSource = PdfSource.Custom(CustomSourceDescriptor(customPdfSourceAdapter)),
+        pageRange = pageRange,
+        pageSpacing = pageSpacing
+    )
 }
 
 @OptIn(ExperimentalTime::class)
@@ -66,6 +75,8 @@ data class PdfState(
 
     private lateinit var bufferPool: ConsumerBufferPool
     internal lateinit var pages: LinkedHashMap<Int, PdfPageState>
+
+    internal val pageRatios: SnapshotStateMap<Int, Float?> = mutableStateMapOf()
 
     /**
      * Source of truth for vertical scroll state.
@@ -160,7 +171,9 @@ data class PdfState(
     }
 
     private fun scaledPageHeight(pageIdx: Int, scaledWidth: Float = scaledPageWidth(viewport, scale)): Float {
-        return scaledWidth / (pages[pageIdx]!!.aspectRatio)
+        // If aspect ratio is not known yet, fallback to one of the other pages or A4.
+        val aspectRatio = pageRatios[pageIdx] ?: pageRatios.firstNotNullOfOrNull { it.value } ?: 1f
+        return scaledWidth / (aspectRatio)
     }
 
     @Composable
@@ -175,7 +188,7 @@ data class PdfState(
     @Composable
     internal fun rememberScaledPageHeight(page: Int): State<Float> {
         val scaledWidth by rememberScaledPageWidth(page)
-        return remember(page, scaledWidth) {
+        return remember(page, scaledWidth, pageRatios[page]) {
             derivedStateOf {
                 scaledPageHeight(page, scaledWidth)
             }
@@ -353,11 +366,12 @@ data class PdfState(
                     )
                 )
                 response.map { resp ->
+                    error.value = null
                     resp to buffer
-                }.onFailure { error ->
-                    this@PdfState.error.value = error
-                    e("Failed to render viewport", error)
-                }.getOrNull()
+                }.getOrElse {
+                    error.value = it
+                    null
+                }
             }
         }
     }
@@ -365,6 +379,10 @@ data class PdfState(
     internal suspend fun renderFullPage(transform: PageTransform): Pair<RenderResponse, ConsumerBuffer>? {
         val buffer = bufferPool.getBufferPage(transform)
         return withContext(Dispatchers.IO) {
+            pageRatios[transform.pageIndex] = renderer.getPageRatio(transform.pageIndex).getOrElse {
+                this@PdfState.error.value = it
+                return@withContext null
+            }
             buffer.withAddress {
                 val response = renderer.render(
                     RenderRequest(
@@ -375,11 +393,12 @@ data class PdfState(
                     )
                 )
                 response.map { resp ->
+                    error.value = null
                     resp to buffer
-                }.onFailure { error ->
-                    this@PdfState.error.value = error
-                    e("Failed to render pages", error)
-                }.getOrNull()
+                }.getOrElse {
+                    error.value = it
+                    null
+                }
             }
         }
     }
@@ -404,14 +423,14 @@ data class PdfState(
     }
 
     internal fun initPages(renderer: PdfRenderer): Result<Unit> {
-        return renderer.getPageRatios().mapCatching { allRatios ->
-            val truncated = allRatios.withIndex()
-                .drop(pageRange.first).take(min(pageRange.last - pageRange.first, allRatios.size - pageRange.first) + 1)
+        return renderer.getPageCount().mapCatching { count ->
+            val range = (0..<count)
+            val truncated = range.withIndex()
+                .drop(pageRange.first).take(min(pageRange.last - pageRange.first, count - pageRange.first) + 1)
             val map = linkedMapOf<Int, PdfPageState>()
-            truncated.forEach { (pageIdx, ratio) ->
+            truncated.forEach { (pageIdx, _) ->
                 map[pageIdx] = PdfPageState(
                     pageIdx,
-                    aspectRatio = ratio
                 )
             }
             pages = map
@@ -432,6 +451,7 @@ data class PdfState(
                         d("Failed to open document: $it")
                         this@PdfState.error.value = it
                     }.onSuccess {
+                        error.value = null
                         initPages(renderer).getOrThrow()
                         isInitialized.value = true
                     }
@@ -441,6 +461,7 @@ data class PdfState(
                 isInitialized.value = false
                 if (this@PdfState::renderer.isInitialized) {
                     renderer.close()
+                    pdfSource.dispose()
                 }
             }
         }

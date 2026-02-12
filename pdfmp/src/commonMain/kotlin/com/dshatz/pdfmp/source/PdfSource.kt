@@ -3,10 +3,15 @@ package com.dshatz.pdfmp.source
 import kotlinx.io.files.Path
 
 sealed interface PdfSource {
-    val marker: Byte
-    fun packValue(): ByteArray
-    fun pack(): ByteArray {
-        return byteArrayOf(marker) + packValue()
+
+    fun dispose()
+    sealed interface Basic: PdfSource {
+        val marker: Byte
+        fun packValue(): ByteArray
+
+        fun pack(): ByteArray {
+            return byteArrayOf(marker) + packValue()
+        }
     }
     companion object {
         fun unpack(packed: ByteArray): PdfSource {
@@ -22,15 +27,17 @@ sealed interface PdfSource {
         }
     }
 
-    data class PdfPath(val path: Path): PdfSource {
+    data class PdfPath(val path: Path): PdfSource, Basic {
         override val marker: Byte = 0x11
 
         override fun packValue(): ByteArray {
             return path.toString().encodeToByteArray()
         }
+
+        override fun dispose() {}
     }
 
-    data class PdfBytes(val bytes: ByteArray): PdfSource {
+    data class PdfBytes(val bytes: ByteArray): PdfSource, Basic {
         override fun equals(other: Any?): Boolean {
             return other is PdfBytes && other.bytes.contentEquals(bytes)
         }
@@ -43,6 +50,14 @@ sealed interface PdfSource {
 
         override fun packValue(): ByteArray {
             return bytes
+        }
+
+        override fun dispose() {}
+    }
+
+    data class Custom(val customSourceDescriptor: CustomSourceDescriptor): PdfSource {
+        override fun dispose() {
+            customSourceDescriptor.dispose()
         }
     }
 }

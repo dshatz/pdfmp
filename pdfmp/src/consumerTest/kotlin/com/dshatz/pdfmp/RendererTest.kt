@@ -23,9 +23,10 @@ val rendererTests by testSuite {
 
         test("get page ratios") {
             val renderer = initWithSamplePdf()
-            val ratios = renderer.getPageRatios().getOrThrow()
-            ratios.size shouldBe EXPECTED_PAGE_COUNT
-            ratios shouldBe generateSequence { 0.77272725f }.take(ratios.size).toList()
+            val size = renderer.getPageCount().getOrThrow()
+            val ratios = (0..<size).map { renderer.getPageRatio(it) }
+        size shouldBe EXPECTED_PAGE_COUNT
+        ratios shouldBe generateSequence { Result.success(0.77272725f) }.take(size).toList()
         }
         test("render one whole page") {
             val renderer = initWithSamplePdf()
