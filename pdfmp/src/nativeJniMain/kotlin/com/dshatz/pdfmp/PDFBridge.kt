@@ -2,21 +2,18 @@
 
 package com.dshatz.pdfmp
 
+import com.dshatz.kni.annotations.JNIConnect
 import com.dshatz.pdfmp.PDFBridgeConst.CLASS_NAME
 import com.dshatz.pdfmp.PDFBridgeConst.PACKAGE_NAME
 import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.model.RenderResponse
+import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
-import dev.datlag.nkommons.JNIConnect
-import kotlinx.cinterop.COpaque
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.StableRef
-import kotlinx.cinterop.asStableRef
-import kotlinx.cinterop.toCPointer
-import kotlinx.cinterop.toLong
+import kotlinx.cinterop.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
+import kotlinx.io.writeFloat
 
 
 private fun <T> returnResult(
@@ -64,19 +61,29 @@ fun createNativeRenderer(packedSource: ByteArray): ByteArray {
 @JNIConnect(
     packageName = PACKAGE_NAME,
     className = CLASS_NAME,
-    functionName = "getAspectRatio"
+    functionName = "createNativeRendererCustom"
 )
-fun getAspectRatio(rendererPtr: PdfRendererPtr, pageIndex: Int): Float {
-    return rendererPtr.getRenderer().getAspectRatio(pageIndex)
+fun createNativeRendererCustom(source: CustomPdfSourceAdapter): ByteArray {
+    val initResult = runBlocking {
+        val descriptor = createFileAccessFromSource(source)
+        descriptor.mapCatching {
+            val rendererResult = PdfRendererFactory.createFromSource(PdfSource.Custom(it))
+            rendererResult.mapCatching { renderer ->
+                val stableRef = StableRef.create(renderer)
+                stableRef.asCPointer().toLong()
+            }.getOrThrow()
+        }
+    }
+    return returnResult(initResult, Buffer::writeLong)
 }
 
 @JNIConnect(
     packageName = PACKAGE_NAME,
     className = CLASS_NAME,
-    functionName = "getPageRatios"
+    functionName = "getAspectRatio"
 )
-fun getPageRatios(rendererPtr: PdfRendererPtr): ByteArray {
-    return returnResult(rendererPtr.getRenderer().getPageRatios(), ::packMap)
+fun getAspectRatio(rendererPtr: PdfRendererPtr, pageIndex: Int): ByteArray {
+    return returnResult(rendererPtr.getRenderer().getPageRatio(pageIndex), { writeFloat(it) })
 }
 
 @JNIConnect(

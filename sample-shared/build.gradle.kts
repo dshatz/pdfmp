@@ -8,6 +8,7 @@ plugins {
     alias(libs.plugins.compose)
     alias(libs.plugins.compose.kt)
     alias(libs.plugins.android.lib)
+    alias(libs.plugins.atomicfu)
 }
 
 kotlin {
@@ -36,6 +37,10 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.components.resources)
             implementation(compose.materialIconsExtended)
+
+            implementation(libs.ktor.core)
+            implementation(libs.ktor.cio)
+            implementation(libs.jni.buffers)
         }
     }
 }

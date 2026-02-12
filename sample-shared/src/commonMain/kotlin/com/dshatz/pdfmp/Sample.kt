@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedIconButton
@@ -31,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dshatz.pdfmp.compose.PdfView
@@ -39,9 +42,13 @@ import com.dshatz.pdfmp.compose.state.DisplayState
 import com.dshatz.pdfmp.compose.state.rememberPdfState
 import com.dshatz.pdfmp.compose.state.zoomPercents
 import com.dshatz.pdfmp.sample.Res
+import com.dshatz.pdfmp.sample.ic_doc
+import com.dshatz.pdfmp.source.CustomSourceDescriptor
 import com.dshatz.pdfmp.source.PdfSource
+import io.ktor.client.HttpClient
 import kotlinx.coroutines.launch
 import kotlinx.io.files.Path
+import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
 
 @Composable
@@ -97,7 +104,7 @@ fun Sample() {
                 selected = selected == 5,
                 onClick = { selected = 5 },
                 content = {
-                    Text("Large file")
+                    Text("Network file")
                 }
             )
         }
@@ -113,7 +120,7 @@ fun Sample() {
             } else if (it == 4) {
                 MissingDoc()
             } else {
-                LargeFile()
+                NetworkFile()
             }
         }
 
@@ -271,12 +278,27 @@ private fun MissingDoc() {
 }
 
 @Composable
-private fun LargeFile() {
-    val pdf = rememberPdfState(PdfSource.PdfPath(Path("/home/dshatz/Downloads/200MB-TESTFILE.ORG.pdf")))
-    Box {
+private fun NetworkFile() {
+    val pdf = rememberPdfState(
+        NetworkPdfSourceAdapter("https://www.princexml.com/samples/icelandic/dictionary.pdf", HttpClient()),
+//        NetworkPdfSourceAdapter("https://file-examples.com/storage/fe7c74cc10698a50e99ed2d/2017/10/file-example_PDF_1MB.pdf", HttpClient()),
+        pageSpacing = 50.dp
+    )
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        val state by pdf.displayState
         PdfView(
             pdf,
             modifier = Modifier.fillMaxSize()
         )
+        if (state is DisplayState.Initializing) {
+            CircularProgressIndicator()
+        }
+        (state as? DisplayState.Error)?.error?.message?.let {
+            Text(it, color = Color.Red)
+        }
+
     }
 }
+
+@Composable
+fun iconPainter(): Painter = painterResource(Res.drawable.ic_doc)

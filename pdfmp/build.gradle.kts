@@ -1,6 +1,9 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
+import com.dshatz.pdfmp.buildlogic.Host
 import com.dshatz.pdfmp.buildlogic.configureTests
+import com.dshatz.pdfmp.buildlogic.getHost
+import com.dshatz.pdfmp.buildlogic.isMacos
 import com.dshatz.pdfmp.buildlogic.nativeTargets
 import org.gradle.internal.extensions.stdlib.capitalized
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
@@ -8,7 +11,6 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.SharedLibrary
-import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 
 plugins {
@@ -16,7 +18,7 @@ plugins {
     alias(libs.plugins.android.lib)
     alias(libs.plugins.kotest)
     alias(libs.plugins.ksp)
-//    alias(libs.plugins.atomicfu)
+    alias(libs.plugins.osdetector)
     alias(libs.plugins.publish)
     jacoco
 }
@@ -45,7 +47,7 @@ fun KotlinNativeTarget.setUpPdfiumCinterop() {
     compilations.getByName("main").cinterops {
         create("pdfium") {
             val binariesModuleDir = rootProject.project("pdfium-binaries").projectDir
-            val platformFolder = when (targetName) {
+            val iosDir = when (targetName) {
                 "iosArm64" -> "ios-arm64"
                 "iosX64", "iosSimulatorArm64" -> "ios-arm64_x86_64-simulator"
                 else -> null // Skip unsupported ios native targets
@@ -56,8 +58,8 @@ fun KotlinNativeTarget.setUpPdfiumCinterop() {
             packageName("com.dshatz.internal.pdfium")
 
             // ios only
-            if (platformFolder != null) {
-                val libPath = "$binariesModuleDir/binaries/ios-framework/pdfium.xcframework/$platformFolder"
+            if (iosDir != null) {
+                val libPath = "$binariesModuleDir/binaries/ios-framework/pdfium.xcframework/$iosDir"
                 extraOpts("-staticLibrary", "libpdfium.a", "-libraryPath", libPath)
             }
         }
@@ -168,7 +170,9 @@ kotlin {
                     }
                     withAndroidNative()
                 }
-                withIos()
+                group("nativeNonJni") {
+                    withIos()
+                }
             }
         }
     }
@@ -200,8 +204,10 @@ kotlin {
     linuxX64 { setUpPdfiumCinterop(); setupSharedLib() }
     linuxArm64 { setUpPdfiumCinterop(); setupSharedLib() }
     mingwX64 { setUpPdfiumCinterop(); setupSharedLib() }
-    macosArm64 { setUpPdfiumCinterop(); setupSharedLib() }
-    macosX64 { setUpPdfiumCinterop(); setupSharedLib() }
+    if (project.isMacos()) {
+        macosArm64 { setUpPdfiumCinterop(); setupSharedLib() }
+        macosX64 { setUpPdfiumCinterop(); setupSharedLib() }
+    }
 
     // iOS Targets
     iosArm64 { setUpPdfiumCinterop(); setupSharedLib(); setupIosFramework() }
@@ -212,11 +218,12 @@ kotlin {
         commonMain.dependencies {
             api(libs.io)
             implementation(libs.coroutines)
+            implementation(libs.jni.annotations)
+            implementation(libs.jni.buffers)
         }
         getByName("nativeJniMain") {
             dependencies {
                 implementation(libs.jni)
-                implementation(libs.jni.annotations)
             }
         }
         getByName("androidNativeMain").dependsOn(getByName("nativeJniMain"))
@@ -250,6 +257,11 @@ kotlin {
             }
             implementation("org.jetbrains.skiko:skiko-awt-runtime-$targetOs-$targetArch:$skikoVersion")
             implementation(libs.kotest.junit5)
+        }
+        val nativeJniMain by getting {
+            dependencies {
+//                implementation(project(":native-tools"))
+            }
         }
     }
     compilerOptions {
@@ -368,7 +380,7 @@ kotlin.sourceSets.getByName("jvmTest") {
 }
 
 tasks.named<Jar>("jvmJar") {
-    from(generateReleaseResources)
+    from(generateDebugResources)
 }
 
 tasks.withType<JavaExec>().configureEach {
@@ -383,8 +395,10 @@ dependencies {
     add("kspAndroidNativeArm64", libs.jni.ksp)
     add("kspAndroidNativeArm32", libs.jni.ksp)
     add("kspAndroidNativeX86", libs.jni.ksp)
-    add("kspMacosX64", libs.jni.ksp)
-    add("kspMacosArm64", libs.jni.ksp)
+    if (project.isMacos()) {
+        add("kspMacosX64", libs.jni.ksp)
+        add("kspMacosArm64", libs.jni.ksp)
+    }
     add("kspIosX64", libs.jni.ksp)
     add("kspIosArm64", libs.jni.ksp)
     add("kspIosSimulatorArm64", libs.jni.ksp)

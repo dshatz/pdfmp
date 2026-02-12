@@ -9,12 +9,15 @@ import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.model.RenderResponse
 import com.dshatz.pdfmp.source.PdfSource
-import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.ReentrantLock
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.atomicfu.locks.withLock
 import kotlinx.cinterop.*
+import kotlinx.coroutines.sync.Mutex
+import platform.posix.pthread_mutex_t
 
 @OptIn(ExperimentalForeignApi::class)
-actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
+actual class PdfRenderer(private val source: PdfSource) {
 
     private var doc: CPointer<fpdf_document_t__>? = null
     private var pinnedData: Pinned<ByteArray>? = null
@@ -25,51 +28,76 @@ actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
         }
     }
 
+
     @OptIn(UnsafeNumber::class)
-    fun openFile(): Result<Unit> = synchronized(this) {
+    fun openFile(): Result<Unit> {
         return runCatching {
             doc = when (source) {
-                is PdfSource.PdfBytes -> {
-                    pinnedData = source.bytes.pin()
-                    FPDF_LoadMemDocument(
-                        pinnedData!!.addressOf(0),
-                        source.bytes.size,
-                        null
-                    )
+                is PdfSource.Basic -> {
+                    when (source) {
+                        is PdfSource.PdfBytes -> {
+                            pinnedData = source.bytes.pin()
+                            FPDF_LoadMemDocument(
+                                pinnedData!!.addressOf(0),
+                                source.bytes.size,
+                                null
+                            )
+                        }
+                        is PdfSource.PdfPath -> {
+                            if (checkFilePath(source.path)) {
+                                FPDF_LoadDocument(source.path.toString(), null)
+                            } else throw FileError()
+                        }
+                    }
                 }
-                is PdfSource.PdfPath -> {
-                    if (checkFilePath(source.path)) {
-                        FPDF_LoadDocument(source.path.toString(), null)
-                    } else throw FileError()
+                is PdfSource.Custom -> {
+                    FPDF_LoadCustomDocument(source.customSourceDescriptor.pdfiumAccess, null)
                 }
             }
             if (doc == null || doc.rawValue == nativeNullPtr) {
                 val pdfErrorCode = FPDF_GetLastError().toByte()
-                PdfiumException.getError(pdfErrorCode)?.let { throw it }
+                val exception = PdfiumException.getError(pdfErrorCode) ?: RuntimeException("doc is null")
+                throw exception
             }
         }
     }
 
-    fun openCustomFile(): Result<Unit> = synchronized(this) {
+    /*private fun openCustomFile(file: CPointer<FPDF_FILEACCESS>): Result<Unit> = synchronized(this) {
         return runCatching {
-
+            doc = FPDF_LoadCustomDocument(file, null)
         }
-    }
+    }*/
 
     @OptIn(UnsafeNumber::class)
-    actual suspend fun render(renderRequest: RenderRequest): Result<RenderResponse> = synchronized(this) {
-        runCatching {
+    actual suspend fun render(renderRequest: RenderRequest): Result<RenderResponse> {
+        return runCatching {
             renderPages(
                 renderRequest.transforms,
                 renderRequest.bufferInfo.address,
                 renderRequest.bufferInfo.dimensions
             )
+        }.recoverCatching {
+            val customSourceError = getLastErrorForCustomSource()
+            if (customSourceError != null) {
+                error(customSourceError)
+            } else throw it
         }
     }
 
-    actual fun getPageCount(): Result<Int> = synchronized(this) {
-        runCatching {
+    private fun getLastErrorForCustomSource(): String? {
+        val customSourceDescriptor = (source as? PdfSource.Custom)?.customSourceDescriptor
+
+        return customSourceDescriptor?.lastError
+    }
+
+    @OptIn(UnsafeNumber::class)
+    actual fun getPageCount(): Result<Int> {
+        return runCatching {
             val document = getDocument()
+            if (doc == null || document.rawValue.toLong() == 0L) {
+                return Result.failure(Exception("Document handle is NULL before calling PageCount"))
+            }
+
             FPDF_GetPageCount(document)
         }
     }
@@ -77,7 +105,9 @@ actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
     @OptIn(UnsafeNumber::class)
     private fun CPointer<fpdf_document_t__>.openPage(pageIndex: Int): FPDF_PAGE? {
         return FPDF_LoadPage(this, pageIndex)
-            ?: error("Failed to load page $pageIndex. Error: ${FPDF_GetLastError()}")
+            ?: run {
+                error("Failed to load page $pageIndex: ${getLastErrorForCustomSource() ?: FPDF_GetLastError()}")
+            }
     }
 
     @OptIn(ExperimentalForeignApi::class, UnsafeNumber::class)
@@ -169,12 +199,13 @@ actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
     /**
      * Call this when the Screen/Component is destroyed
      */
-    actual fun close() = synchronized(this) {
+    actual fun close() {
         runCatching {
             if (doc != null) {
                 FPDF_CloseDocument(doc)
                 pinnedData?.unpin()
                 doc = null
+                source.dispose()
             }
         }.onFailure {
             e("Could not close document", it)
@@ -182,36 +213,33 @@ actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
         Unit
     }
 
-    fun getAspectRatio(pageIndex: Int): Float = synchronized(this) {
-        return runCatching {
-            val document = getDocument()
+    private fun getAspectRatio(pageIndex: Int): Float {
+        val document = getDocument()
 
-            val page = document.openPage(pageIndex)
+        val page = document.openPage(pageIndex)
 
-            try {
-                val width = FPDF_GetPageWidthF(page)
-                val height = FPDF_GetPageHeightF(page)
+        return try {
+            val width = FPDF_GetPageWidthF(page)
+            val height = FPDF_GetPageHeightF(page)
 
-                if (width <= 0f || height <= 0f) {
-                    return@runCatching 1f
-                }
-                width / height
-
-            } finally {
-                FPDF_ClosePage(page)
+            if (width <= 0f || height <= 0f) {
+                error("Invalid size: $width x $height")
             }
-        }.getOrElse { e ->
-            e("Native Error getting aspect ratio", e)
-            0.707f
+            width / height
+
+        } finally {
+            FPDF_ClosePage(page)
         }
     }
 
-    actual fun getPageRatios(): Result<List<Float>> = synchronized(this) {
-        val pageCount = getPageCount()
-        pageCount.mapCatching { pageCount ->
-            (0..<pageCount).map {
-                getAspectRatio(it)
-            }
+    actual fun getPageRatio(pageIndex: Int): Result<Float> {
+        return runCatching {
+            getAspectRatio(pageIndex)
+        }.recoverCatching {
+            val customSourceError = getLastErrorForCustomSource()
+            if (customSourceError != null) {
+                error(customSourceError)
+            } else throw it
         }
     }
 

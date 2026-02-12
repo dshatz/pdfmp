@@ -7,8 +7,8 @@ pluginManagement {
 }
 dependencyResolutionManagement {
     repositories {
-        mavenCentral()
         mavenLocal()
+        mavenCentral()
         google()
     }
 }
@@ -25,6 +25,7 @@ develocity {
 }
 
 includeBuild("build-logic")
+//include(":native-tools")
 include(":pdfmp")
 include(":pdfmp-compose")
 include(":sample")
