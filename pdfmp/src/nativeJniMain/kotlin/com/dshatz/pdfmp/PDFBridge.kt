@@ -64,15 +64,13 @@ fun createNativeRenderer(packedSource: ByteArray): ByteArray {
     functionName = "createNativeRendererCustom"
 )
 fun createNativeRendererCustom(source: CustomPdfSourceAdapter): ByteArray {
-    val initResult = runBlocking {
-        val descriptor = createFileAccessFromSource(source)
-        descriptor.mapCatching {
-            val rendererResult = PdfRendererFactory.createFromSource(PdfSource.Custom(it))
-            rendererResult.mapCatching { renderer ->
-                val stableRef = StableRef.create(renderer)
-                stableRef.asCPointer().toLong()
-            }.getOrThrow()
-        }
+    val descriptor = createFileAccessFromSource(source)
+    val initResult = descriptor.mapCatching {
+        val rendererResult = PdfRendererFactory.createFromSource(PdfSource.Custom(it))
+        rendererResult.mapCatching { renderer ->
+            val stableRef = StableRef.create(renderer)
+            stableRef.asCPointer().toLong()
+        }.getOrThrow()
     }
     return returnResult(initResult, Buffer::writeLong)
 }
@@ -86,7 +84,7 @@ fun getAspectRatio(rendererPtr: PdfRendererPtr, pageIndex: Int): ByteArray {
     return returnResult(rendererPtr.getRenderer().getPageRatio(pageIndex), { writeFloat(it) })
 }
 
-@JNIConnect(
+/*@JNIConnect(
     packageName = PACKAGE_NAME,
     className = CLASS_NAME,
     functionName = "render"
@@ -98,6 +96,17 @@ fun render(renderer: PdfRendererPtr, reqBytes: ByteArray): ByteArray = runBlocki
         renderer.render(req),
         RenderResponse::pack
     )
+}*/
+
+@JNIConnect(
+    packageName = PACKAGE_NAME,
+    className = CLASS_NAME,
+    functionName = "renderAsync"
+)
+fun renderAsync(renderer: PdfRendererPtr, reqBytes: ByteArray, callback: RenderCallback) {
+    val renderer = renderer.getRenderer()
+    val req = RenderRequest.unpack(reqBytes)
+    renderer.renderAsync(req, callback)
 }
 
 @JNIConnect(

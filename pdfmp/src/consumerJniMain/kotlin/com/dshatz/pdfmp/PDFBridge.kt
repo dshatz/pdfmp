@@ -30,5 +30,6 @@ object PDFBridge {
 //    external fun getPageRatios(renderer: PdfRendererPtr): ByteArray
     external fun getAspectRatio(renderer: PdfRendererPtr, pageIndex: Int): ByteArray
     external fun render(renderer: PdfRendererPtr, reqBytes: ByteArray): ByteArray
+    external fun renderAsync(renderer: PdfRendererPtr, reqBytes: ByteArray, callback: RenderCallback)
     external fun close(renderer: PdfRendererPtr)
 }

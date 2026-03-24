@@ -8,19 +8,25 @@ import com.dshatz.pdfmp.model.BufferDimensions
 import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.model.RenderResponse
+import com.dshatz.pdfmp.progressive.renderPageProgressively
 import com.dshatz.pdfmp.source.PdfSource
-import kotlinx.atomicfu.locks.ReentrantLock
-import kotlinx.atomicfu.locks.synchronized
-import kotlinx.atomicfu.locks.withLock
 import kotlinx.cinterop.*
-import kotlinx.coroutines.sync.Mutex
-import platform.posix.pthread_mutex_t
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.io.Buffer
+import kotlinx.io.readByteArray
 
 @OptIn(ExperimentalForeignApi::class)
 actual class PdfRenderer(private val source: PdfSource) {
 
     private var doc: CPointer<fpdf_document_t__>? = null
     private var pinnedData: Pinned<ByteArray>? = null
+
+    private val rendererScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     companion object {
         fun init() {
@@ -62,15 +68,9 @@ actual class PdfRenderer(private val source: PdfSource) {
         }
     }
 
-    /*private fun openCustomFile(file: CPointer<FPDF_FILEACCESS>): Result<Unit> = synchronized(this) {
-        return runCatching {
-            doc = FPDF_LoadCustomDocument(file, null)
-        }
-    }*/
-
     @OptIn(UnsafeNumber::class)
     actual suspend fun render(renderRequest: RenderRequest): Result<RenderResponse> {
-        return runCatching {
+        val renderResponse = runCatching {
             renderPages(
                 renderRequest.transforms,
                 renderRequest.bufferInfo.address,
@@ -82,12 +82,35 @@ actual class PdfRenderer(private val source: PdfSource) {
                 error(customSourceError)
             } else throw it
         }
+
+
+         return renderResponse
+    }
+
+    fun renderAsync(renderRequest: RenderRequest, callback: RenderCallback) {
+        rendererScope.launch {
+            val renderResponse = runCatching {
+                renderPages(
+                    renderRequest.transforms,
+                    renderRequest.bufferInfo.address,
+                    renderRequest.bufferInfo.dimensions
+                )
+            }.recoverCatching {
+                val customSourceError = getLastErrorForCustomSource()
+                if (customSourceError != null) {
+                    error(customSourceError)
+                } else throw it
+            }
+            renderResponse.onSuccess {
+                val buffer = Buffer()
+                RenderResponse.pack(buffer, it)
+                callback.onSuccess(buffer.readByteArray())
+            }.onFailure { callback.onFailure(it.message ?: "Unknown render error") }
+        }
     }
 
     private fun getLastErrorForCustomSource(): String? {
-        val customSourceDescriptor = (source as? PdfSource.Custom)?.customSourceDescriptor
-
-        return customSourceDescriptor?.lastError
+        return (source as? PdfSource.Custom)?.customSourceDescriptor?.sourceAdapter?.getLastError()
     }
 
     @OptIn(UnsafeNumber::class)
@@ -103,7 +126,7 @@ actual class PdfRenderer(private val source: PdfSource) {
     }
 
     @OptIn(UnsafeNumber::class)
-    private fun CPointer<fpdf_document_t__>.openPage(pageIndex: Int): FPDF_PAGE? {
+    private fun CPointer<fpdf_document_t__>.openPage(pageIndex: Int): FPDF_PAGE {
         return FPDF_LoadPage(this, pageIndex)
             ?: run {
                 error("Failed to load page $pageIndex: ${getLastErrorForCustomSource() ?: FPDF_GetLastError()}")
@@ -111,7 +134,7 @@ actual class PdfRenderer(private val source: PdfSource) {
     }
 
     @OptIn(ExperimentalForeignApi::class, UnsafeNumber::class)
-    private fun renderPages(
+    private suspend fun renderPages(
         transforms: List<PageTransform>,
         bufferAddress: Long,
         bufferDimensions: BufferDimensions
@@ -174,7 +197,7 @@ actual class PdfRenderer(private val source: PdfSource) {
                     val startX = -transform.leftCutoff
                     val startY = currentY - transform.topCutoff
 
-                    FPDF_RenderPageBitmap(
+                    renderPageProgressively(
                         combinedBitmap,
                         page,
                         startX,
@@ -206,6 +229,7 @@ actual class PdfRenderer(private val source: PdfSource) {
                 pinnedData?.unpin()
                 doc = null
                 source.dispose()
+                rendererScope.cancel()
             }
         }.onFailure {
             e("Could not close document", it)
@@ -249,7 +273,7 @@ actual class PdfRenderer(private val source: PdfSource) {
 }
 
 actual object PdfRendererFactory {
-    actual suspend fun createFromSource(source: PdfSource): Result<PdfRenderer> {
+    actual fun createFromSource(source: PdfSource): Result<PdfRenderer> {
         val renderer = PdfRenderer(source)
         return renderer.openFile().map { renderer }
     }
