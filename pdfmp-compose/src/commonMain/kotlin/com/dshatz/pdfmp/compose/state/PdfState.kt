@@ -355,8 +355,7 @@ data class PdfState(
         if (transforms.isEmpty()) return null
 
         val buffer = bufferPool.getBufferViewport(transforms)
-        return withContext(Dispatchers.IO) {
-            buffer.withAddress {
+        return buffer.withAddress {
                 val response = renderer.render(
                     RenderRequest(
                         transforms,
@@ -373,32 +372,31 @@ data class PdfState(
                     null
                 }
             }
-        }
+
     }
 
     internal suspend fun renderFullPage(transform: PageTransform): Pair<RenderResponse, ConsumerBuffer>? {
         val buffer = bufferPool.getBufferPage(transform)
-        return withContext(Dispatchers.IO) {
-            pageRatios[transform.pageIndex] = renderer.getPageRatio(transform.pageIndex).getOrElse {
-                this@PdfState.error.value = it
-                return@withContext null
-            }
-            buffer.withAddress {
-                val response = renderer.render(
-                    RenderRequest(
-                        listOf(transform),
-                        0,
-                        0,
-                        buffer.dimensions.withAddress(it)
-                    )
+
+        pageRatios[transform.pageIndex] = renderer.getPageRatio(transform.pageIndex).getOrElse {
+            this@PdfState.error.value = it
+            return null
+        }
+        return buffer.withAddress {
+            val response = renderer.render(
+                RenderRequest(
+                    listOf(transform),
+                    0,
+                    0,
+                    buffer.dimensions.withAddress(it)
                 )
-                response.map { resp ->
-                    error.value = null
-                    resp to buffer
-                }.getOrElse {
-                    error.value = it
-                    null
-                }
+            )
+            response.map { resp ->
+                error.value = null
+                resp to buffer
+            }.getOrElse {
+                error.value = it
+                null
             }
         }
     }

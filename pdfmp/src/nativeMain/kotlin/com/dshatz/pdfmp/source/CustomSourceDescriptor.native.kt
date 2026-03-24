@@ -11,7 +11,7 @@ expect class CustomSourceDescriptorNative {
 
     fun dispose()
 
-    val lastError: String?
+    val sourceAdapter: CustomPdfSourceAdapter
 
     fun clearError()
 }

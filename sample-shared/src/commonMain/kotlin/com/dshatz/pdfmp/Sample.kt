@@ -2,6 +2,7 @@ package com.dshatz.pdfmp
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -303,6 +304,14 @@ private fun NetworkFile() {
         }
         (state as? DisplayState.Error)?.error?.message?.let {
             Text(it, color = Color.Red)
+        }
+        ElevatedCard(Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp)) {
+            Column(verticalArrangement = Arrangement.Center) {
+                val layout by pdf.layoutInfo()
+                layout?.let {
+                    Text("Page ${it.mostVisiblePage.value?.pageIdx}/${it.totalPages.value}")
+                }
+            }
         }
 
     }

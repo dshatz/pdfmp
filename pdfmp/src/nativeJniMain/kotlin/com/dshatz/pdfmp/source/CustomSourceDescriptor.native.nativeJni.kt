@@ -15,8 +15,10 @@ actual class CustomSourceDescriptorNative(
         nativeHeap.free(pdfiumAccess.rawValue)
     }
 
-    actual val lastError: String? get() = sourceRef.get().getLastError()
     actual fun clearError() {
         sourceRef.get().setError(null)
     }
+
+    actual val sourceAdapter: CustomPdfSourceAdapter
+        get() = sourceRef.get()
 }
