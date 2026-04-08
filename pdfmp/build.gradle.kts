@@ -1,5 +1,8 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
+import com.dshatz.pdfmp.buildlogic.addAndroidNativeTargets
+import com.dshatz.pdfmp.buildlogic.addIosTargets
+import com.dshatz.pdfmp.buildlogic.configureOptional
 import com.dshatz.pdfmp.buildlogic.configureTests
 import com.dshatz.pdfmp.buildlogic.nativeTargets
 import org.gradle.internal.extensions.stdlib.capitalized
@@ -178,14 +181,11 @@ kotlin {
     }
     jvm()
 
-    // Android Native Targets
-
-    val androidTargets = listOf(
-        androidNativeX64 {  setUpPdfiumCinterop(); setupSharedLib() },
-        androidNativeArm64 {  setUpPdfiumCinterop(); setupSharedLib() },
-        androidNativeArm32 {  setUpPdfiumCinterop(); setupSharedLib() },
-        androidNativeX86 {  setUpPdfiumCinterop(); setupSharedLib() },
-    )
+    val androidTargets = addAndroidNativeTargets(nativeTargets)
+    androidTargets.forEach {
+        it.setUpPdfiumCinterop()
+        it.setupSharedLib()
+    }
 
     configure(androidTargets) {
         binaries.all {
@@ -198,16 +198,19 @@ kotlin {
 
 
     // Desktop Native Targets
-    linuxX64 { setUpPdfiumCinterop(); setupSharedLib() }
-    linuxArm64 { setUpPdfiumCinterop(); setupSharedLib() }
-    mingwX64 { setUpPdfiumCinterop(); setupSharedLib() }
-    macosArm64 { setUpPdfiumCinterop(); setupSharedLib() }
-    macosX64 { setUpPdfiumCinterop(); setupSharedLib() }
+    if ("linuxX64" in nativeTargets) linuxX64 { setUpPdfiumCinterop(); setupSharedLib() }
+    if ("linuxArm64" in nativeTargets) linuxArm64 { setUpPdfiumCinterop(); setupSharedLib() }
+    if ("mingwX64" in nativeTargets) mingwX64 { setUpPdfiumCinterop(); setupSharedLib() }
+    if ("macosArm64" in nativeTargets) macosArm64 { setUpPdfiumCinterop(); setupSharedLib() }
+    if ("macosX64" in nativeTargets) macosX64 { setUpPdfiumCinterop(); setupSharedLib() }
 
     // iOS Targets
-    iosArm64 { setUpPdfiumCinterop(); setupSharedLib(); setupIosFramework() }
-    iosSimulatorArm64 { setUpPdfiumCinterop(); setupSharedLib(); setupIosFramework() }
-    iosX64 { setUpPdfiumCinterop(); setupSharedLib(); setupIosFramework() }
+    val iosTargets = addIosTargets(nativeTargets)
+    iosTargets.forEach {
+        it.setUpPdfiumCinterop()
+        it.setupSharedLib()
+        it.setupIosFramework()
+    }
 
     sourceSets {
         commonMain.dependencies {
@@ -220,7 +223,9 @@ kotlin {
                 implementation(libs.jni.annotations)
             }
         }
-        getByName("androidNativeMain").dependsOn(getByName("nativeJniMain"))
+        configureOptional("androidNativeMain") {
+            dependsOn(getByName("nativeJniMain"))
+        }
         val (nonAndroidConsumerMain, nonAndroidConsumerTest) = createMainAndTest("nonAndroidConsumer", "consumer", "jvm", "ios")
         nonAndroidConsumerMain.dependencies {
             implementation(libs.skiko)
@@ -228,7 +233,6 @@ kotlin {
 
 
         commonTest.dependencies {
-//            implementation(kotlin("test"))
             implementation(libs.coroutines.test)
             implementation(libs.kotest)
             implementation(libs.kotest.assertions)
@@ -267,8 +271,8 @@ fun NamedDomainObjectContainer<KotlinSourceSet>.createMainAndTest(name: String, 
     test.dependsOn(getByName("${parent}Test"))
 
     dependants.forEach {
-        getByName("${it}Main").dependsOn(main)
-        getByName("${it}Test").dependsOn(test)
+        configureOptional("${it}Main") { dependsOn(main) }
+        configureOptional("${it}Test") { dependsOn(test) }
     }
     return main to test
 }
@@ -377,18 +381,9 @@ tasks.withType<JavaExec>().configureEach {
 }
 
 dependencies {
-    add("kspLinuxX64", libs.jni.ksp)
-    add("kspLinuxArm64", libs.jni.ksp)
-    add("kspMingwX64", libs.jni.ksp)
-    add("kspAndroidNativeX64", libs.jni.ksp)
-    add("kspAndroidNativeArm64", libs.jni.ksp)
-    add("kspAndroidNativeArm32", libs.jni.ksp)
-    add("kspAndroidNativeX86", libs.jni.ksp)
-    add("kspMacosX64", libs.jni.ksp)
-    add("kspMacosArm64", libs.jni.ksp)
-    add("kspIosX64", libs.jni.ksp)
-    add("kspIosArm64", libs.jni.ksp)
-    add("kspIosSimulatorArm64", libs.jni.ksp)
+    nativeTargets.forEach {
+        add("ksp${it.capitalized()}", libs.jni.ksp)
+    }
 }
 
 mavenPublishing {

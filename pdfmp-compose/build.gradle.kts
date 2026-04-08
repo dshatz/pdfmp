@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalComposeLibrary::class, ExperimentalKotlinGradlePluginApi::class)
 
+import com.dshatz.pdfmp.buildlogic.addIosTargets
 import com.dshatz.pdfmp.buildlogic.configureTests
+import com.dshatz.pdfmp.buildlogic.nativeTargets
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
@@ -32,7 +34,7 @@ kotlin {
     androidTarget()
     jvm()
 
-    val iosTargets = listOf(iosX64(), iosArm64(), iosSimulatorArm64())
+    val iosTargets = addIosTargets(nativeTargets)
 
     val xcf = XCFramework()
     iosTargets.forEach {

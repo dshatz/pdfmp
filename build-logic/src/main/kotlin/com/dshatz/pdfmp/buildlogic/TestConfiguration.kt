@@ -1,5 +1,6 @@
 package com.dshatz.pdfmp.buildlogic
 
+import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Project
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.getByType
@@ -9,8 +10,13 @@ import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.withType
 import org.gradle.testing.jacoco.tasks.JacocoReport
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
+import org.jetbrains.kotlin.gradle.tasks.KotlinTest
 
 private val androidTargets = listOf(
     "androidNativeX86",
@@ -33,16 +39,16 @@ fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
         ignoreFailures = true
         finalizedBy("jacocoTestReport")
     }
-    nativeTargets.forEach { target ->
-        runCatching {
-            tasks.named<Test>("${target}Test") {
-                logger.lifecycle("UP-TO-DATE check for $name is disabled, forcing it to run.")
-                outputs.upToDateWhen { false }
-                ignoreFailures = true
-                finalizedBy("jacocoTestReport")
-            }
-        }.onFailure {
-            logger.lifecycle("Skipping native test: $target")
+    tasks.withType<KotlinNativeSimulatorTest>().forEach {
+        logger.lifecycle("Found native simulator test: $it")
+    }
+
+    runCatching {
+        tasks.withType<KotlinTest>() {
+            logger.lifecycle("UP-TO-DATE check for $name is disabled, forcing it to run.")
+            outputs.upToDateWhen { false }
+            ignoreFailures = true
+            finalizedBy("jacocoTestReport")
         }
     }
 
@@ -75,5 +81,28 @@ fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
             csv.required.set(true)
             html.required.set(true)
         }
+    }
+}
+
+fun NamedDomainObjectContainer<KotlinSourceSet>.configureOptional(name: String, configure: KotlinSourceSet.() -> Unit) {
+    if (name in names) {
+        getByName(name).configure()
+    }
+}
+
+fun KotlinMultiplatformExtension.addIosTargets(nativeTargets: List<String>): List<KotlinNativeTarget> {
+    return buildList {
+        if ("iosX64" in nativeTargets) add(iosX64())
+        if ("iosArm64" in nativeTargets) add(iosArm64())
+        if ("iosSimulatorArm64" in nativeTargets) add(iosSimulatorArm64())
+    }
+}
+
+fun KotlinMultiplatformExtension.addAndroidNativeTargets(nativeTargets: List<String>): List<KotlinNativeTarget> {
+    return buildList {
+        if ("androidNativeX86" in nativeTargets) add(androidNativeX86())
+        if ("androidNativeX64" in nativeTargets) add(androidNativeX64())
+        if ("androidNativeArm32" in nativeTargets) add(androidNativeArm32())
+        if ("androidNativeArm64" in nativeTargets) add(androidNativeArm64())
     }
 }
