@@ -12,9 +12,15 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 
+private val androidTargets = listOf(
+    "androidNativeX86",
+    "androidNativeX64",
+    "androidNativeArm32",
+    "androidNativeArm64"
+)
 val Project.nativeTargets get() = run {
     val nativeTargets: String? by project
-    nativeTargets?.split(',') ?: listOf("linuxX64", "linuxArm64", "mingwX64", "macosX64", "macosArm64")
+    nativeTargets?.split(',') ?: (listOf("linuxX64", "linuxArm64", "mingwX64", "macosX64", "macosArm64") + androidTargets)
 }
 
 fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
