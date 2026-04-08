@@ -1,13 +1,13 @@
 package com.dshatz.pdfmp
 
 import com.dshatz.pdfmp.source.PdfSource
+import de.infix.testBalloon.framework.core.testSuite
 import io.kotest.assertions.throwables.shouldNotThrowAny
-import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import kotlin.random.Random
 
-class LoadLibraryTest: FunSpec({
+val loadLibraryTest by testSuite {
     test("init pdfium") {
         shouldNotThrowAny {
             InitLib().init()
@@ -21,4 +21,4 @@ class LoadLibraryTest: FunSpec({
         exception!!.message shouldContain "PDFIUM error: "
     }
 
-})
+}
