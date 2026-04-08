@@ -1,10 +1,10 @@
 package com.dshatz.pdfmp
 
 import com.dshatz.pdfmp.model.PageTransform
-import io.kotest.core.spec.style.FunSpec
+import de.infix.testBalloon.framework.core.testSuite
 import io.kotest.matchers.shouldBe
 
-class PageTransformTest: FunSpec({
+val pageTransformTest by testSuite {
     test("uncut transform") {
         val size = 1000
         val transform = PageTransform(
@@ -30,4 +30,4 @@ class PageTransformTest: FunSpec({
 
         transform.uncut().sliceSize() shouldBe (size to size)
     }
-})
+}

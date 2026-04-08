@@ -4,14 +4,13 @@ import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.SizeB
 import com.dshatz.pdfmp.model.bytes
 import com.dshatz.pdfmp.model.calculateSize
+import de.infix.testBalloon.framework.core.testSuite
 import io.kotest.assertions.withClue
-import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.comparables.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 
-class ConsumerBufferPoolTest: FunSpec({
-
+val consumerBufferTest by testSuite {
     test("get for page") {
         val pool = ConsumerBufferPool()
         pool.totalBufferMemory shouldBe SizeB.ZERO
@@ -85,7 +84,7 @@ class ConsumerBufferPoolTest: FunSpec({
             buffer.isFree shouldBe true
         }
     }
-})
+}
 
 private fun makeSquareTransform(
     idx: Int,

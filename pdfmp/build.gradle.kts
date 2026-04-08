@@ -12,9 +12,9 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 plugins {
     alias(libs.plugins.mp)
     alias(libs.plugins.android.lib)
-    alias(libs.plugins.kotest)
     alias(libs.plugins.ksp)
     alias(libs.plugins.publish)
+    alias(libs.plugins.testballoon)
     jacoco
 }
 
@@ -97,22 +97,13 @@ tasks.withType<KotlinNativeLink>().configureEach {
     val taskName = name
     if (taskName.contains("Test", ignoreCase = true) && target.startsWith("macos")) {
         val target = target.substringBefore('_') + target.substringAfter('_').capitalized()
-        doLast {
-            val originalDylibPath = project(":pdfium-binaries").projectDir.absolutePath + "/binaries/${target}/libpdfium.dylib"
 
-            val testBinary = outputFile.get()
+        val testBinary = outputFile.get()
+        val originalDylibPath = project(":pdfium-binaries").projectDir.absolutePath + "/binaries/${target}/libpdfium.dylib"
 
-            logger.lifecycle("Patch test executable for $target")
-            exec {
-                commandLine(
-                    "install_name_tool",
-                    "-change",
-                    "./libpdfium.dylib", // The install_name currently inside the binary
-                    originalDylibPath,   // The absolute path you want it to use during test
-                    testBinary.absolutePath
-                )
-            }
-            println("Patched test binary dependencies for: ${testBinary.name}")
+        tasks.register<Exec>("patch${target}Test") {
+            executable = "install_name_tool"
+            setArgs(listOf("-change", "./libpdfium.dylib", originalDylibPath, testBinary.absolutePath))
         }
     }
 }
@@ -228,8 +219,8 @@ kotlin {
 
         commonTest.dependencies {
             implementation(libs.coroutines.test)
-            implementation(libs.kotest)
-            implementation(libs.kotest.assertions)
+            implementation(libs.test.core)
+            implementation(libs.test.kotest)
         }
         jvmTest.dependencies {
             val skikoVersion = libs.versions.skiko.get()
@@ -248,7 +239,6 @@ kotlin {
                 else -> "x64"
             }
             implementation("org.jetbrains.skiko:skiko-awt-runtime-$targetOs-$targetArch:$skikoVersion")
-            implementation(libs.kotest.junit5)
         }
     }
     compilerOptions {

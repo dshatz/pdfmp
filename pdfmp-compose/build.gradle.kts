@@ -11,8 +11,8 @@ plugins {
     alias(libs.plugins.mp)
     alias(libs.plugins.compose)
     alias(libs.plugins.compose.kt)
-    alias(libs.plugins.kotest)
-    alias(libs.plugins.ksp) // for kotest
+    alias(libs.plugins.testballoon)
+    alias(libs.plugins.ksp) // for testballoon
     alias(libs.plugins.android.lib)
     alias(libs.plugins.publish)
     jacoco
@@ -55,13 +55,12 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.coroutines.test)
             implementation(compose.uiTest)
-            implementation(libs.kotest)
-            implementation(libs.kotest.assertions)
+            implementation(libs.test.core)
+            implementation(libs.test.kotest)
         }
         jvmTest.dependencies {
             implementation(libs.coroutines.test)
             implementation("io.mockk:mockk:1.14.6")
-            implementation(libs.kotest.junit5)
         }
     }
     configureTests(this)

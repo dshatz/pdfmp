@@ -3,7 +3,6 @@ package com.dshatz.pdfmp.buildlogic
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Project
 import org.gradle.api.tasks.testing.Test
-import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.provideDelegate
 import org.gradle.kotlin.dsl.register
@@ -13,9 +12,6 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
-import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeHostTest
-import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
-import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinTest
 
 private val androidTargets = listOf(
@@ -24,9 +20,24 @@ private val androidTargets = listOf(
     "androidNativeArm32",
     "androidNativeArm64"
 )
+
+private val linuxTargets = listOf(
+    "linuxX64",
+    "linuxArm64"
+)
+
+private val macOsTargets = listOf(
+    "macosX64",
+    "macosArm64"
+)
+
+private val windowsTargets = listOf(
+    "mingwX64"
+)
+
 val Project.nativeTargets get() = run {
     val nativeTargets: String? by project
-    nativeTargets?.split(',') ?: (listOf("linuxX64", "linuxArm64", "mingwX64", "macosX64", "macosArm64") + androidTargets)
+    nativeTargets?.split(',') ?: (linuxTargets + macOsTargets + windowsTargets + androidTargets)
 }
 
 fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
@@ -37,14 +48,12 @@ fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
         logger.lifecycle("UP-TO-DATE check for $name is disabled, forcing it to run.")
         outputs.upToDateWhen { false }
         ignoreFailures = true
-        finalizedBy("jacocoTestReport")
     }
 
     tasks.withType<KotlinTest>() {
         logger.lifecycle("UP-TO-DATE check for $name is disabled, forcing it to run.")
         outputs.upToDateWhen { false }
         ignoreFailures = true
-        finalizedBy("jacocoTestReport")
     }
 
 
@@ -60,7 +69,8 @@ fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
                 logger.lifecycle("Wiring tests for $targetName")
                 val target = kotlin.targets.getByName(targetName)
                 val compilation = target.compilations.getByName("main")
-                dependsOn("${target.name}Test")
+                val testTask = "${target.name}Test"
+                dependsOn(tasks.matching { it.name == testTask })
                 classDirectories.from(compilation.output.classesDirs)
             }.onFailure {
                 logger.warn("Could not wire test: $targetName, reason: $it")
