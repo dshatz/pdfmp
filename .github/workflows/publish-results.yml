@@ -2,13 +2,16 @@ name: Publish Results
 
 on:
   workflow_run:
-    workflows: ["Test & Publish"]
+    workflows: ["Test"]
     types: [completed]
 
 jobs:
   publish-test-results:
+    # Only run if after a PR.
+    if: |
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion != 'cancelled'
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion != 'cancelled'
     permissions:
       checks: write
       pull-requests: write
