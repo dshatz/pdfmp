@@ -1,8 +1,8 @@
-name: Publish Results
+name: Test Results
 
 on:
   workflow_run:
-    workflows: ["Test"]
+    workflows: ["Verify"]
     types: [completed]
 
 jobs:
@@ -35,7 +35,6 @@ jobs:
           event_file: event_file/event.json
           check_name: Linux x64
           commit: ${{ github.event.workflow_run.head_sha }}
-          event_name: ${{ github.event.workflow_run.event }}
           files: "test-report-ubuntu-latest/**/*.xml"
 
       - name: Publish Windows Test Results
@@ -44,7 +43,6 @@ jobs:
           event_file: event_file/event.json
           check_name: Windows x64
           commit: ${{ github.event.workflow_run.head_sha }}
-          event_name: ${{ github.event.workflow_run.event }}
           files: "test-report-windows-latest/**/*.xml"
 
       - name: Publish MacOS Test Results
@@ -53,7 +51,6 @@ jobs:
           event_file: event_file/event.json
           check_name: MacOS ARM
           commit: ${{ github.event.workflow_run.head_sha }}
-          event_name: ${{ github.event.workflow_run.event }}
           files: "test-report-macos/**/*.xml"
 
       - name: Publish iOS Test Results
@@ -62,7 +59,6 @@ jobs:
           event_file: event_file/event.json
           check_name: iOS Simulator
           commit: ${{ github.event.workflow_run.head_sha }}
-          event_name: ${{ github.event.workflow_run.event }}
           files: "test-report-ios/**/*.xml"
 
       - name: Generate Coverage Summary
