@@ -15,21 +15,49 @@ jobs:
       contents: read
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          pattern: test-results-*
-          merge-multiple: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
 
       - name: Get PR Number
-        id: pr
-        run: echo "nr=$(cat pr_number.txt)" >> $GITHUB_OUTPUT
+        id: get_pr
+        run: |
+          # Find the pr_number.txt in one of the downloaded folders
+          PR_NUMBER=$(cat pr-number/pr_number.txt)
+          echo "nr=$PR_NUMBER" >> $GITHUB_OUTPUT
 
-      - name: Publish Test Results
+      - name: Publish Linux Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          files: "**/test-results/**/*.xml"
+          event_file: event_file/event.json
+          commit: ${{ github.event.workflow_run.head_sha }}
+          event_name: ${{ github.event.workflow_run.event }}
+          files: "test-report-ubuntu-latest/**/*.xml"
+
+      - name: Publish Windows Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          event_file: event_file/event.json
+          commit: ${{ github.event.workflow_run.head_sha }}
+          event_name: ${{ github.event.workflow_run.event }}
+          files: "test-report-windows-latest/**/*.xml"
+
+      - name: Publish MacOS Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          event_file: event_file/event.json
+          commit: ${{ github.event.workflow_run.head_sha }}
+          event_name: ${{ github.event.workflow_run.event }}
+          files: "test-report-macos/**/*.xml"
+
+      - name: Publish iOS Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          event_file: event_file/event.json
+          commit: ${{ github.event.workflow_run.head_sha }}
+          event_name: ${{ github.event.workflow_run.event }}
+          files: "test-report-ios/**/*.xml"
 
       - name: Generate Coverage Summary
         uses: danielpalme/ReportGenerator-GitHub-Action@5.5.1
@@ -41,5 +69,5 @@ jobs:
       - name: Create comment
         uses: peter-evans/create-or-update-comment@v4
         with:
-          issue-number: ${{ steps.pr.outputs.nr }}
+          issue-number: ${{ steps.get_pr.outputs.nr }}
           body-path: coveragereport/SummaryGithub.md
