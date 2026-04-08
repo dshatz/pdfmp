@@ -1,0 +1,45 @@
+name: Publish Results
+
+on:
+  workflow_run:
+    workflows: ["Test & Publish"]
+    types: [completed]
+
+jobs:
+  publish-test-results:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*
+          merge-multiple: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Get PR Number
+        id: pr
+        run: echo "nr=$(cat pr_number.txt)" >> $GITHUB_OUTPUT
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: "**/test-results/**/*.xml"
+
+      - name: Generate Coverage Summary
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.5.1
+        with:
+          reports: "**/jacocoTestReport.xml"
+          targetdir: "coveragereport"
+          reporttypes: 'MarkdownSummaryGithub'
+
+      - name: Create comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ steps.pr.outputs.nr }}
+          body-path: coveragereport/SummaryGithub.md

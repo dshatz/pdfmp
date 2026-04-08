@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   test:
-    if: github.event_name == 'pull_request' || github.event_name == 'release'
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'release'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -78,66 +78,6 @@ jobs:
         with:
           name: coverage-report-${{ matrix.os }}
           path: '**/build/jacocoReports/jacocoTestReport/jacocoTestReport.xml'
-
-  publish-test-results:
-    name: "Publish Tests Results"
-    needs: test
-    runs-on: ubuntu-latest
-    permissions:
-      checks: write
-      pull-requests: write
-      contents: read
-      issues: read
-    if: (!cancelled()) && github.event_name == 'pull_request' || github.event_name == 'release'
-
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Publish Linux Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          files: "artifacts/test-report-ubuntu-latest/**/*.xml"
-          check_name: Linux X64
-      - name: Publish Windows Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          files: "artifacts/test-report-windows-latest/**/*.xml"
-          check_name: Windows X64
-
-      - name: Publish MacOS Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          files: "artifacts/test-report-macos/**/*.xml"
-          check_name: MacOS ARM
-      - name: Publish MacOS Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          files: "artifacts/test-report-ios/**/*.xml"
-          check_name: iOS ARM
-      - name: Add coverage to PR
-        id: jacoco
-        uses: danielpalme/ReportGenerator-GitHub-Action@5.5.1
-        with:
-          reports: |
-            artifacts/coverage-report-ubuntu-latest/**/*.xml
-          targetdir: "coveragereport"
-          reporttypes: 'Badges;MarkdownSummaryGithub;Markdown;HTML'
-      - name: Upload coverage report artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: CoverageReport
-          path: coveragereport
-      - name: Create comment
-        uses: peter-evans/create-or-update-comment@v5
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body-path: coveragereport/SummaryGithub.md
-      - name: Publish coverage in build summary
-        run: cat coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
-        shell: bash
 
   publish:
     needs: test # Only publish if tests pass
