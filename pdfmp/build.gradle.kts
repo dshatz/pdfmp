@@ -93,17 +93,22 @@ private fun KotlinNativeTarget.setupSharedLib() {
     }
 }
 
-tasks.withType<KotlinNativeLink>().configureEach {
-    val taskName = name
-    if (taskName.contains("Test", ignoreCase = true) && target.startsWith("macos")) {
-        val target = target.substringBefore('_') + target.substringAfter('_').capitalized()
+macOsTargets.forEach { target ->
+    val capitalizedTarget = target.capitalized()
 
-        val testBinary = outputFile.get()
+    val patchTask = tasks.register<Exec>("patch${target}Test") {
         val originalDylibPath = project(":pdfium-binaries").projectDir.absolutePath + "/binaries/${target}/libpdfium.dylib"
+        executable = "install_name_tool"
+        argumentProviders.add(CommandLineArgumentProvider {
+            val linkTask = tasks.named<KotlinNativeLink>("linkDebugTest$capitalizedTarget").get()
+            val testBinary = linkTask.outputFile.get().absolutePath
+            listOf("-change", "./libpdfium.dylib", originalDylibPath, testBinary)
+        })
+    }
 
-        tasks.register<Exec>("patch${target}Test") {
-            executable = "install_name_tool"
-            setArgs(listOf("-change", "./libpdfium.dylib", originalDylibPath, testBinary.absolutePath))
+    tasks.withType<KotlinNativeLink>().configureEach {
+        if (name == "linkDebugTest$capitalizedTarget") {
+            finalizedBy(patchTask)
         }
     }
 }

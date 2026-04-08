@@ -26,7 +26,7 @@ private val linuxTargets = listOf(
     "linuxArm64"
 )
 
-private val macOsTargets = listOf(
+val macOsTargets = listOf(
     "macosX64",
     "macosArm64"
 )
