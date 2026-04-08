@@ -64,10 +64,9 @@ fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
         val buildDirectory = layout.buildDirectory
 
         val jvmMain = kotlin.targets.getByName("jvm").compilations.getByName("main")
-        nativeTargets.forEach { targetName: String ->
+        nativeTargets.forEach {
             runCatching {
-                logger.lifecycle("Wiring tests for $targetName")
-                val target = kotlin.targets.getByName(targetName)
+                val target = kotlin.targets.getByName(it)
                 val compilation = target.compilations.getByName("main")
                 val testTask = "${target.name}Test"
                 dependsOn(tasks.matching { it.name == testTask })
