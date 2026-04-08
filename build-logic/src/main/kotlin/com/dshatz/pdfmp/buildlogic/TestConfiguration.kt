@@ -72,8 +72,6 @@ fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
                 val testTask = "${target.name}Test"
                 dependsOn(tasks.matching { it.name == testTask })
                 classDirectories.from(compilation.output.classesDirs)
-            }.onFailure {
-                logger.warn("Could not wire test: $targetName, reason: $it")
             }
         }
         classDirectories.from(jvmMain.output.classesDirs)

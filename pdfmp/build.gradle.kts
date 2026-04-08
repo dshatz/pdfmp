@@ -1,6 +1,11 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
 import com.dshatz.pdfmp.buildlogic.*
+import com.dshatz.pdfmp.buildlogic.addAndroidNativeTargets
+import com.dshatz.pdfmp.buildlogic.addIosTargets
+import com.dshatz.pdfmp.buildlogic.configureOptional
+import com.dshatz.pdfmp.buildlogic.configureTests
+import com.dshatz.pdfmp.buildlogic.nativeTargets
 import org.gradle.internal.extensions.stdlib.capitalized
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
