@@ -23,7 +23,6 @@ jobs:
       - name: Get PR Number
         id: get_pr
         run: |
-          # Find the pr_number.txt in one of the downloaded folders
           PR_NUMBER=$(cat pr-number/pr_number.txt)
           echo "nr=$PR_NUMBER" >> $GITHUB_OUTPUT
 
