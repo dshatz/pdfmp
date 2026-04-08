@@ -1,23 +1,20 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
-import com.dshatz.pdfmp.buildlogic.configureTests
-import com.dshatz.pdfmp.buildlogic.nativeTargets
+import com.dshatz.pdfmp.buildlogic.*
 import org.gradle.internal.extensions.stdlib.capitalized
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.SharedLibrary
-import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 
 plugins {
     alias(libs.plugins.mp)
     alias(libs.plugins.android.lib)
-    alias(libs.plugins.kotest)
     alias(libs.plugins.ksp)
-//    alias(libs.plugins.atomicfu)
     alias(libs.plugins.publish)
+    alias(libs.plugins.testballoon)
     jacoco
 }
 
@@ -96,26 +93,22 @@ private fun KotlinNativeTarget.setupSharedLib() {
     }
 }
 
-tasks.withType<KotlinNativeLink>().configureEach {
-    val taskName = name
-    if (taskName.contains("Test", ignoreCase = true) && target.startsWith("macos")) {
-        val target = target.substringBefore('_') + target.substringAfter('_').capitalized()
-        doLast {
-            val originalDylibPath = project(":pdfium-binaries").projectDir.absolutePath + "/binaries/${target}/libpdfium.dylib"
+macOsTargets.forEach { target ->
+    val capitalizedTarget = target.capitalized()
 
-            val testBinary = outputFile.get()
+    val patchTask = tasks.register<Exec>("patch${target}Test") {
+        val originalDylibPath = project(":pdfium-binaries").projectDir.absolutePath + "/binaries/${target}/libpdfium.dylib"
+        executable = "install_name_tool"
+        argumentProviders.add(CommandLineArgumentProvider {
+            val linkTask = tasks.named<KotlinNativeLink>("linkDebugTest$capitalizedTarget").get()
+            val testBinary = linkTask.outputFile.get().absolutePath
+            listOf("-change", "./libpdfium.dylib", originalDylibPath, testBinary)
+        })
+    }
 
-            logger.lifecycle("Patch test executable for $target")
-            exec {
-                commandLine(
-                    "install_name_tool",
-                    "-change",
-                    "./libpdfium.dylib", // The install_name currently inside the binary
-                    originalDylibPath,   // The absolute path you want it to use during test
-                    testBinary.absolutePath
-                )
-            }
-            println("Patched test binary dependencies for: ${testBinary.name}")
+    tasks.withType<KotlinNativeLink>().configureEach {
+        if (name == "linkDebugTest$capitalizedTarget") {
+            finalizedBy(patchTask)
         }
     }
 }
@@ -173,19 +166,16 @@ kotlin {
         }
     }
     jvmToolchain(21)
+    jvm()
     androidTarget {
         instrumentedTestVariant.sourceSetTree.set(KotlinSourceSetTree.test)
     }
-    jvm()
 
-    // Android Native Targets
-
-    val androidTargets = listOf(
-        androidNativeX64 {  setUpPdfiumCinterop(); setupSharedLib() },
-        androidNativeArm64 {  setUpPdfiumCinterop(); setupSharedLib() },
-        androidNativeArm32 {  setUpPdfiumCinterop(); setupSharedLib() },
-        androidNativeX86 {  setUpPdfiumCinterop(); setupSharedLib() },
-    )
+    val androidTargets = addAndroidNativeTargets(nativeTargets)
+    androidTargets.forEach {
+        it.setUpPdfiumCinterop()
+        it.setupSharedLib()
+    }
 
     configure(androidTargets) {
         binaries.all {
@@ -198,16 +188,19 @@ kotlin {
 
 
     // Desktop Native Targets
-    linuxX64 { setUpPdfiumCinterop(); setupSharedLib() }
-    linuxArm64 { setUpPdfiumCinterop(); setupSharedLib() }
-    mingwX64 { setUpPdfiumCinterop(); setupSharedLib() }
-    macosArm64 { setUpPdfiumCinterop(); setupSharedLib() }
-    macosX64 { setUpPdfiumCinterop(); setupSharedLib() }
+    if ("linuxX64" in nativeTargets) linuxX64 { setUpPdfiumCinterop(); setupSharedLib() }
+    if ("linuxArm64" in nativeTargets) linuxArm64 { setUpPdfiumCinterop(); setupSharedLib() }
+    if ("mingwX64" in nativeTargets) mingwX64 { setUpPdfiumCinterop(); setupSharedLib() }
+    if ("macosArm64" in nativeTargets) macosArm64 { setUpPdfiumCinterop(); setupSharedLib() }
+    if ("macosX64" in nativeTargets) macosX64 { setUpPdfiumCinterop(); setupSharedLib() }
 
     // iOS Targets
-    iosArm64 { setUpPdfiumCinterop(); setupSharedLib(); setupIosFramework() }
-    iosSimulatorArm64 { setUpPdfiumCinterop(); setupSharedLib(); setupIosFramework() }
-    iosX64 { setUpPdfiumCinterop(); setupSharedLib(); setupIosFramework() }
+    val iosTargets = addIosTargets(nativeTargets)
+    iosTargets.forEach {
+        it.setUpPdfiumCinterop()
+        it.setupSharedLib()
+        it.setupIosFramework()
+    }
 
     sourceSets {
         commonMain.dependencies {
@@ -220,7 +213,9 @@ kotlin {
                 implementation(libs.jni.annotations)
             }
         }
-        getByName("androidNativeMain").dependsOn(getByName("nativeJniMain"))
+        configureOptional("androidNativeMain") {
+            dependsOn(getByName("nativeJniMain"))
+        }
         val (nonAndroidConsumerMain, nonAndroidConsumerTest) = createMainAndTest("nonAndroidConsumer", "consumer", "jvm", "ios")
         nonAndroidConsumerMain.dependencies {
             implementation(libs.skiko)
@@ -228,10 +223,9 @@ kotlin {
 
 
         commonTest.dependencies {
-//            implementation(kotlin("test"))
             implementation(libs.coroutines.test)
-            implementation(libs.kotest)
-            implementation(libs.kotest.assertions)
+            implementation(libs.test.core)
+            implementation(libs.test.kotest)
         }
         jvmTest.dependencies {
             val skikoVersion = libs.versions.skiko.get()
@@ -250,7 +244,6 @@ kotlin {
                 else -> "x64"
             }
             implementation("org.jetbrains.skiko:skiko-awt-runtime-$targetOs-$targetArch:$skikoVersion")
-            implementation(libs.kotest.junit5)
         }
     }
     compilerOptions {
@@ -267,8 +260,8 @@ fun NamedDomainObjectContainer<KotlinSourceSet>.createMainAndTest(name: String, 
     test.dependsOn(getByName("${parent}Test"))
 
     dependants.forEach {
-        getByName("${it}Main").dependsOn(main)
-        getByName("${it}Test").dependsOn(test)
+        configureOptional("${it}Main") { dependsOn(main) }
+        configureOptional("${it}Test") { dependsOn(test) }
     }
     return main to test
 }
@@ -377,18 +370,9 @@ tasks.withType<JavaExec>().configureEach {
 }
 
 dependencies {
-    add("kspLinuxX64", libs.jni.ksp)
-    add("kspLinuxArm64", libs.jni.ksp)
-    add("kspMingwX64", libs.jni.ksp)
-    add("kspAndroidNativeX64", libs.jni.ksp)
-    add("kspAndroidNativeArm64", libs.jni.ksp)
-    add("kspAndroidNativeArm32", libs.jni.ksp)
-    add("kspAndroidNativeX86", libs.jni.ksp)
-    add("kspMacosX64", libs.jni.ksp)
-    add("kspMacosArm64", libs.jni.ksp)
-    add("kspIosX64", libs.jni.ksp)
-    add("kspIosArm64", libs.jni.ksp)
-    add("kspIosSimulatorArm64", libs.jni.ksp)
+    nativeTargets.forEach {
+        add("ksp${it.capitalized()}", libs.jni.ksp)
+    }
 }
 
 mavenPublishing {

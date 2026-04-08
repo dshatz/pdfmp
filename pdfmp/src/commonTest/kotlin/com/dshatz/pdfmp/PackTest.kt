@@ -3,11 +3,9 @@ package com.dshatz.pdfmp
 import com.dshatz.pdfmp.model.BufferDimensions
 import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.RenderRequest
-import io.kotest.assertions.throwables.shouldNotThrow
+import de.infix.testBalloon.framework.core.testSuite
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.assertions.throwables.shouldThrow
-import io.kotest.core.spec.style.FunSpec
-import io.kotest.core.spec.style.ShouldSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
@@ -15,9 +13,8 @@ import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import kotlin.random.Random
 
-class PackTest: ShouldSpec({
-
-    should("pack page transform") {
+val PackTests by testSuite {
+    test("pack page transform") {
         val input = randomPageTransform()
         val buffer = Buffer()
         input.pack(buffer)
@@ -25,7 +22,7 @@ class PackTest: ShouldSpec({
         PageTransform.unpack(buffer.copy()) shouldBe input
     }
 
-    should("pack render request") {
+    test("pack render request") {
         val input = RenderRequest(
             transforms = generateSequence { randomPageTransform() }.take(Random.nextInt(10)).toList(),
             0,
@@ -41,7 +38,7 @@ class PackTest: ShouldSpec({
     }
 
 
-    should("pack failure throwing") {
+    test("pack failure throwing") {
         val result = Result.failure<Unit>(RuntimeException("native message"))
         val buffer = Buffer()
         result.pack(buffer, {})
@@ -52,7 +49,7 @@ class PackTest: ShouldSpec({
         exception.message shouldContain "native message"
     }
 
-    should("pack failure") {
+    test("pack failure") {
         val result = Result.failure<Unit>(RuntimeException("native message"))
         val buffer = Buffer()
         result.pack(buffer, {})
@@ -64,14 +61,14 @@ class PackTest: ShouldSpec({
         exception!!.message shouldContain "native message"
     }
 
-    should("pack success") {
+    test("pack success") {
         val result = Result.success<Int>(999)
         val buffer = Buffer()
         result.pack(buffer, Buffer::writeInt)
 
         unpackResultOrThrow(buffer.readByteArray(), Buffer::readInt) shouldBe 999
     }
-})
+}
 
 private fun randomPageTransform(): PageTransform {
     return PageTransform(

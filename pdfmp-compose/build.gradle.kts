@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalComposeLibrary::class, ExperimentalKotlinGradlePluginApi::class)
 
+import com.dshatz.pdfmp.buildlogic.addIosTargets
 import com.dshatz.pdfmp.buildlogic.configureTests
+import com.dshatz.pdfmp.buildlogic.nativeTargets
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
@@ -9,8 +11,8 @@ plugins {
     alias(libs.plugins.mp)
     alias(libs.plugins.compose)
     alias(libs.plugins.compose.kt)
-    alias(libs.plugins.kotest)
-    alias(libs.plugins.ksp) // for kotest
+    alias(libs.plugins.testballoon)
+    alias(libs.plugins.ksp) // for testballoon
     alias(libs.plugins.android.lib)
     alias(libs.plugins.publish)
     jacoco
@@ -32,7 +34,7 @@ kotlin {
     androidTarget()
     jvm()
 
-    val iosTargets = listOf(iosX64(), iosArm64(), iosSimulatorArm64())
+    val iosTargets = addIosTargets(nativeTargets)
 
     val xcf = XCFramework()
     iosTargets.forEach {
@@ -53,13 +55,12 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.coroutines.test)
             implementation(compose.uiTest)
-            implementation(libs.kotest)
-            implementation(libs.kotest.assertions)
+            implementation(libs.test.core)
+            implementation(libs.test.kotest)
         }
         jvmTest.dependencies {
             implementation(libs.coroutines.test)
             implementation("io.mockk:mockk:1.14.6")
-            implementation(libs.kotest.junit5)
         }
     }
     configureTests(this)

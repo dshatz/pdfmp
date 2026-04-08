@@ -1,6 +1,8 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
+import com.dshatz.pdfmp.buildlogic.nativeTargets
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
@@ -18,7 +20,11 @@ kotlin {
         }
     }
     androidTarget()
-    val iosTargets = listOf(iosX64(), iosArm64(), iosSimulatorArm64())
+    val iosTargets = buildList {
+        if ("iosX64" in nativeTargets) add(iosX64())
+        if ("iosArm64" in nativeTargets) add(iosArm64())
+        if ("iosSimulatorArm64" in nativeTargets) add(iosSimulatorArm64())
+    }
 
     val xcf = XCFramework()
     iosTargets.forEach {
