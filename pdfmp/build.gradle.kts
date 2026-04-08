@@ -191,6 +191,7 @@ kotlin {
         binaries.all {
             // Force the linker to use 16KB alignment
             linkerOpts("-z", "max-page-size=16384")
+            linkerOpts("-z", "common-page-size=16384")
             linkerOpts("-Wl,--allow-shlib-undefined")
         }
     }
