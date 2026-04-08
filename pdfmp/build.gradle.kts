@@ -1,17 +1,12 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
-import com.dshatz.pdfmp.buildlogic.addAndroidNativeTargets
-import com.dshatz.pdfmp.buildlogic.addIosTargets
-import com.dshatz.pdfmp.buildlogic.configureOptional
-import com.dshatz.pdfmp.buildlogic.configureTests
-import com.dshatz.pdfmp.buildlogic.nativeTargets
+import com.dshatz.pdfmp.buildlogic.*
 import org.gradle.internal.extensions.stdlib.capitalized
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.SharedLibrary
-import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 
 plugins {
@@ -19,7 +14,6 @@ plugins {
     alias(libs.plugins.android.lib)
     alias(libs.plugins.kotest)
     alias(libs.plugins.ksp)
-//    alias(libs.plugins.atomicfu)
     alias(libs.plugins.publish)
     jacoco
 }
@@ -176,10 +170,10 @@ kotlin {
         }
     }
     jvmToolchain(21)
+    jvm()
     androidTarget {
         instrumentedTestVariant.sourceSetTree.set(KotlinSourceSetTree.test)
     }
-    jvm()
 
     val androidTargets = addAndroidNativeTargets(nativeTargets)
     androidTargets.forEach {
