@@ -1,0 +1,49 @@
+name: "Run Tests Android"
+description: "Run Android tests in Firebase Test Lab"
+inputs:
+  module:
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: 'Authenticate to Google Cloud'
+      uses: google-github-actions/auth@v2
+      with:
+        project_id: "pdfmp-1a53c"
+        workload_identity_provider: "projects/355871242508/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+        service_account: "gh-test@pdfmp-1a53c.iam.gserviceaccount.com"
+
+
+    - name: 'Set up Cloud SDK'
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: ${{ inputs.project_id }}
+
+    # Download test apk
+    - name: Download Artifacts
+      uses: actions/download-artifact@v8
+      id: download
+      with:
+        name: ${{ inputs.module }}-androidTest.apk
+
+    - name: Instrumentation Tests (${{ inputs.module }})
+      shell: bash
+      env:
+        ANDROID_TEST_LOCATION: ${{ steps.download.outputs.download-path }}/${{ inputs.module }}-androidTest.apk
+        DEVICE_MODEL: SmallPhone.arm,version=35
+      run: >
+        gcloud firebase test android run
+        --type instrumentation
+        --app $ANDROID_TEST_LOCATION
+        --test $ANDROID_TEST_LOCATION
+        --device model=$DEVICE_MODEL
+        --results-bucket=pdfmp-firebase-test
+        --results-dir="run-${{ github.run_id }}"
+        --no-record-video
+
+    - name: Download Results
+      shell: bash
+      run: |
+        mkdir -p firebase-results
+        gcloud storage cp -r "gs://pdfmp-firebase-test/run-${{ github.run_id }}/**/test_result_*.xml" ./android-results/${{inputs.module}}/

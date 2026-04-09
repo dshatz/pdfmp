@@ -1,0 +1,104 @@
+name: Verify Android
+
+permissions:
+  contents: read
+  checks: write
+  statuses: write
+  pull-requests: write
+
+on:
+  workflow_run:
+    workflows: ["Verify"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      manual_run_id:
+        description: Manual Test Run ID
+        required: true
+
+jobs:
+  test-android:
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    outputs:
+      pr_number: ${{ steps.pr.outputs.nr }}
+    strategy:
+      matrix:
+        module: ["pdfmp", "pdfmp-compose"]
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Download APK
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.inputs.manual_run_id || github.event.workflow_run.id }}
+          name: ${{ matrix.module }}-androidTest.apk
+
+      - name: Download PR number
+        uses: actions/download-artifact@v8
+        id: download
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.inputs.manual_run_id || github.event.workflow_run.id }}
+          name: pr_number.txt
+      - name: Read PR number
+        id: pr
+        shell: bash
+        run: |
+          PR_NUMBER=$(cat pr_number.txt)
+          echo "nr=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: 'Authenticate to Google Cloud'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCLOUD_AUTH }}
+
+      - name: 'Set up Cloud SDK'
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ vars.FIREBASE_PROJECT }}
+
+      - name: Instrumentation Tests (${{ matrix.module }})
+        continue-on-error: true
+        shell: bash
+        env:
+          ANDROID_TEST_LOCATION: ${{ steps.download.outputs.download-path }}/${{ matrix.module }}-androidTest.apk
+          DEVICE_MODEL: SmallPhone.arm,version=35
+          RUN_ID: ${{ github.event.inputs.manual_run_id || github.event.workflow_run.id }}
+        run: >
+          gcloud firebase test android run
+          --type instrumentation
+          --app $ANDROID_TEST_LOCATION
+          --test $ANDROID_TEST_LOCATION
+          --device model=$DEVICE_MODEL
+          --results-bucket=pdfmp-firebase-test
+          --results-dir="run-${RUN_ID}"
+          --no-record-video
+
+      - name: Download results from Firebase
+        if: always()
+        shell: bash
+        env:
+          RUN_ID: ${{ github.event.inputs.manual_run_id || github.event.workflow_run.id }}
+        run: |
+          mkdir -p android-results/${{ matrix.module }}
+          gcloud storage cp -r "gs://pdfmp-firebase-test/run-${RUN_ID}/**/test_result_*.xml" ./android-results/${{matrix.module}}/
+      - name: Upload Results
+        if: always()
+        uses: ./.github/actions/upload-test-results
+        with:
+          platform: android-${{ matrix.module }}
+
+  publish-results-pdfmp:
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    uses: ./.github/workflows/test-reporter.yml
+    needs: ["test-android"]
+    with:
+      platform_name: Android ARM
+      artifact_name: test-report-android-*
+      test_run_id: ${{ github.run_id }}
+      pr_number: ${{ needs.test-android.outputs.pr_number }}
+    secrets: inherit

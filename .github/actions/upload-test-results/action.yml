@@ -1,0 +1,14 @@
+name: "Upload test results"
+inputs:
+  platform:
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Upload Test Results (${{ inputs.platform }})
+      uses: actions/upload-artifact@v7
+      with:
+        name: test-report-${{ inputs.platform }}
+        path: |
+          **/build/test-results/**/*.xml
+          android-results/**/*.xml

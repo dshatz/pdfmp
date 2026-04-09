@@ -1,19 +1,62 @@
 name: Test Results
 
+permissions:
+    checks: write
+    statuses: write
+    pull-requests: write
+    contents: read
+
 on:
   workflow_run:
     workflows: ["Verify"]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      manual_run_id:
+        description: Manual Test Run ID
+        required: true
 
 jobs:
-  publish-test-results:
+  test-results-linux:
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    uses: ./.github/workflows/test-reporter.yml
+    with:
+      platform_name: Linux x64
+      artifact_name: test-report-linuxX64
+      test_run_id: ${{ github.event.inputs.manual_run_id || github.event.workflow_run.id }}
+    secrets: inherit
+  test-results-windows:
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    uses: ./.github/workflows/test-reporter.yml
+    with:
+      platform_name: Windows x64
+      artifact_name: test-report-linuxX64
+      test_run_id: ${{ github.event.inputs.manual_run_id || github.event.workflow_run.id }}
+    secrets: inherit
+  test-results-macos:
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    uses: ./.github/workflows/test-reporter.yml
+    with:
+      platform_name: macOS ARM
+      artifact_name: test-report-macosArm
+      test_run_id: ${{ github.event.inputs.manual_run_id || github.event.workflow_run.id }}
+    secrets: inherit
+  test-results-ios:
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    uses: ./.github/workflows/test-reporter.yml
+    with:
+      platform_name: iOS Simulator
+      artifact_name: test-report-ios
+      test_run_id: ${{ github.event.inputs.manual_run_id || github.event.workflow_run.id }}
+    secrets: inherit
+
+  publish-coverage:
     # Only run if after a PR.
-    if: |
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion != 'cancelled'
+    if: github.event.workflow_run.conclusion != 'cancelled'
     runs-on: ubuntu-latest
     permissions:
       checks: write
+      statuses: write
       pull-requests: write
       contents: read
     steps:
@@ -21,46 +64,13 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
-
+          run-id: ${{ inputs.test_run_id }}
       - name: Get PR Number
         id: get_pr
+        continue-on-error: true
         run: |
           PR_NUMBER=$(cat pr-number/pr_number.txt)
           echo "nr=$PR_NUMBER" >> $GITHUB_OUTPUT
-
-      - name: Publish Linux Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          event_file: event_file/event.json
-          check_name: Linux x64
-          commit: ${{ github.event.workflow_run.head_sha }}
-          files: "test-report-ubuntu-latest/**/*.xml"
-
-      - name: Publish Windows Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          event_file: event_file/event.json
-          check_name: Windows x64
-          commit: ${{ github.event.workflow_run.head_sha }}
-          files: "test-report-windows-latest/**/*.xml"
-
-      - name: Publish MacOS Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          event_file: event_file/event.json
-          check_name: MacOS ARM
-          commit: ${{ github.event.workflow_run.head_sha }}
-          files: "test-report-macos/**/*.xml"
-
-      - name: Publish iOS Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          event_file: event_file/event.json
-          check_name: iOS Simulator
-          commit: ${{ github.event.workflow_run.head_sha }}
-          files: "test-report-ios/**/*.xml"
-
       - name: Generate Coverage Summary
         uses: danielpalme/ReportGenerator-GitHub-Action@5.5.1
         with:
@@ -70,6 +80,7 @@ jobs:
 
       - name: Create comment
         uses: peter-evans/create-or-update-comment@v4
+        continue-on-error: true
         with:
           issue-number: ${{ steps.get_pr.outputs.nr }}
           body-path: coveragereport/SummaryGithub.md
