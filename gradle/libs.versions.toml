@@ -1,7 +1,7 @@
 [versions]
 kotlin = "2.3.0"
 jni = "1.1.0"
-agp = "8.10.1"
+agp = "9.0.1"
 filepicker = "0.12.0"
 publish = "0.35.0"
 skiko = "0.9.22.2"
@@ -11,8 +11,7 @@ testballoon = "0.8.4-K2.3.0"
 [plugins]
 mp = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-knee = { id = "io.deepmedia.tools.knee", version = "1.2.0" }
-android-lib = { id = "com.android.library", version.ref = "agp" }
+android-lib = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 android-app = { id = "com.android.application", version.ref = "agp" }
 ksp = { id = "com.google.devtools.ksp", version = "2.3.6" }
 compose-kt = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
@@ -32,6 +31,10 @@ test-kotest = { module = "de.infix.testBalloon:testBalloon-integration-kotest-as
 
 # For zero-copy bitmap on desktop.
 skiko = { module = "org.jetbrains.skiko:skiko", version.ref = "skiko" }
+
+# Android
+appcompat = { module = "androidx.appcompat:appcompat", version = "1.7.1" }
+activity-compose = { module = "androidx.activity:activity-compose", version = "1.12.2" }
 
 coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.10.2" }
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version = "1.10.2" }

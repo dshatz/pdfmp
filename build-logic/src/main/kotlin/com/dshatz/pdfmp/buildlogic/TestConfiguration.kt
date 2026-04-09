@@ -45,13 +45,11 @@ fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
         useJUnitPlatform()
     }
     tasks.withType<KotlinJvmTest>().configureEach {
-        logger.lifecycle("UP-TO-DATE check for $name is disabled, forcing it to run.")
         outputs.upToDateWhen { false }
         ignoreFailures = true
     }
 
     tasks.withType<KotlinTest>() {
-        logger.lifecycle("UP-TO-DATE check for $name is disabled, forcing it to run.")
         outputs.upToDateWhen { false }
         ignoreFailures = true
     }

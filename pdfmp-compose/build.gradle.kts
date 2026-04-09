@@ -31,7 +31,11 @@ kotlin {
         }
     }
     jvmToolchain(21)
-    androidTarget()
+    androidLibrary {
+        namespace = "com.dshatz.pdfmp.compose"
+        compileSdk = 36
+        minSdk = 24
+    }
     jvm()
 
     val iosTargets = addIosTargets(nativeTargets)
@@ -64,14 +68,6 @@ kotlin {
         }
     }
     configureTests(this)
-}
-
-android {
-    namespace = "com.dshatz.pdfmp.compose"
-    compileSdk = 36
-    defaultConfig {
-        minSdk = 24
-    }
 }
 
 
