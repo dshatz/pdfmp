@@ -170,6 +170,12 @@ kotlin {
         optimization {
             this.consumerKeepRules.file(project.file("consumer-rules.pro"))
         }
+
+        withDeviceTestBuilder {
+            sourceSetTreeName = "test"
+        }.configure {
+            this.instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
     }
 
     val androidTargets = addAndroidNativeTargets(nativeTargets)
