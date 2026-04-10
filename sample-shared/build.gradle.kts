@@ -19,7 +19,11 @@ kotlin {
             mainClass = "com.dshatz.pdfmp.MainKt"
         }
     }
-    androidTarget()
+    androidLibrary {
+        namespace = "com.dshatz.pdfmp.sampleshared"
+        compileSdk = 36
+        minSdk = 24
+    }
     val iosTargets = buildList {
         if ("iosX64" in nativeTargets) add(iosX64())
         if ("iosArm64" in nativeTargets) add(iosArm64())
@@ -43,14 +47,6 @@ kotlin {
             implementation(compose.components.resources)
             implementation(compose.materialIconsExtended)
         }
-    }
-}
-
-android {
-    namespace = "com.dshatz.pdfmp.sampleshared"
-    compileSdk = 36
-    defaultConfig {
-        minSdk = 24
     }
 }
 

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -16,12 +17,14 @@ import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,77 +49,82 @@ import kotlin.math.roundToInt
 
 @Composable
 fun Sample() {
-    Column(Modifier.fillMaxSize().background(Color.Gray)) {
-        var selected by remember { mutableStateOf(1) }
-        val truncatedRange = 2..3
-        PrimaryTabRow(
-            selected,
-            modifier = Modifier.height(60.dp)
-        ) {
-            Tab(
-                selected = selected == 0,
-                onClick = { selected = 0 },
-                content = {
-                    Text("Full document")
-                }
-            )
+    SideEffect {
+        PDFMP.enableLogs = true
+    }
+    MaterialTheme {
+        Column(Modifier.fillMaxSize().background(Color.Gray).systemBarsPadding()) {
+            var selected by remember { mutableStateOf(1) }
+            val truncatedRange = 2..3
+            PrimaryTabRow(
+                selected,
+                modifier = Modifier.height(60.dp)
+            ) {
+                Tab(
+                    selected = selected == 0,
+                    onClick = { selected = 0 },
+                    content = {
+                        Text("Full document")
+                    }
+                )
 
-            Tab(
-                selected = selected == 1,
-                onClick = { selected = 1 },
-                content = {
-                    Text("Pages $truncatedRange")
-                }
-            )
+                Tab(
+                    selected = selected == 1,
+                    onClick = { selected = 1 },
+                    content = {
+                        Text("Pages $truncatedRange")
+                    }
+                )
 
-            Tab(
-                selected = selected == 2,
-                onClick = { selected = 2 },
-                content = {
-                    Text("Landscape")
-                }
-            )
+                Tab(
+                    selected = selected == 2,
+                    onClick = { selected = 2 },
+                    content = {
+                        Text("Landscape")
+                    }
+                )
 
-            Tab(
-                selected = selected == 3,
-                onClick = { selected = 3 },
-                content = {
-                    Text("Colorful")
-                }
-            )
+                Tab(
+                    selected = selected == 3,
+                    onClick = { selected = 3 },
+                    content = {
+                        Text("Colorful")
+                    }
+                )
 
-            Tab(
-                selected = selected == 4,
-                onClick = { selected = 4 },
-                content = {
-                    Text("Missing file")
-                }
-            )
+                Tab(
+                    selected = selected == 4,
+                    onClick = { selected = 4 },
+                    content = {
+                        Text("Missing file")
+                    }
+                )
 
-            Tab(
-                selected = selected == 5,
-                onClick = { selected = 5 },
-                content = {
-                    Text("Large file")
-                }
-            )
-        }
-        AnimatedContent(selected, modifier = Modifier.weight(1f)) {
-            if (it == 0) {
-                FullDoc()
-            } else if (it == 1) {
-                TruncatedDoc(truncatedRange)
-            } else if (it == 2) {
-                LandscapeDoc()
-            } else if (it == 3) {
-                ColoredDoc()
-            } else if (it == 4) {
-                MissingDoc()
-            } else {
-                LargeFile()
+                Tab(
+                    selected = selected == 5,
+                    onClick = { selected = 5 },
+                    content = {
+                        Text("Large file")
+                    }
+                )
             }
-        }
+            AnimatedContent(selected, modifier = Modifier.weight(1f)) {
+                if (it == 0) {
+                    FullDoc()
+                } else if (it == 1) {
+                    TruncatedDoc(truncatedRange)
+                } else if (it == 2) {
+                    LandscapeDoc()
+                } else if (it == 3) {
+                    ColoredDoc()
+                } else if (it == 4) {
+                    MissingDoc()
+                } else {
+                    LargeFile()
+                }
+            }
 
+        }
     }
 }
 

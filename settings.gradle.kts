@@ -27,7 +27,9 @@ develocity {
 includeBuild("build-logic")
 include(":pdfmp")
 include(":pdfmp-compose")
-include(":sample")
+//include(":sample")
+include(":androidapp")
+include(":desktopapp")
 include(":sample-shared")
 include(":pdfium-binaries")
 rootProject.name = "pdf-multiplatform"

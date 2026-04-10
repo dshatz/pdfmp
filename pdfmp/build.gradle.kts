@@ -1,19 +1,20 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
+import com.android.build.gradle.internal.tasks.factory.dependsOn
 import com.dshatz.pdfmp.buildlogic.*
 import org.gradle.internal.extensions.stdlib.capitalized
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
-import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSetTree
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
 import org.jetbrains.kotlin.gradle.plugin.mpp.SharedLibrary
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 
 plugins {
     alias(libs.plugins.mp)
-    alias(libs.plugins.android.lib)
     alias(libs.plugins.ksp)
     alias(libs.plugins.publish)
+    alias(libs.plugins.android.lib)
     alias(libs.plugins.testballoon)
     jacoco
 }
@@ -145,14 +146,8 @@ fun KotlinNativeTarget.setupIosFramework() {
 kotlin {
     applyDefaultHierarchyTemplate {
         common {
-            group("consumer") {
-                group("consumerJni") {
-                    withJvm()
-                    withAndroidTarget()
-                }
-                withAndroidTarget()
-            }
             group("native") {
+                /* more groups created in sourceSets block below */
                 group("nativeJni") {
                     group("desktopNativeJni") {
                         withLinux()
@@ -167,8 +162,20 @@ kotlin {
     }
     jvmToolchain(21)
     jvm()
-    androidTarget {
-        instrumentedTestVariant.sourceSetTree.set(KotlinSourceSetTree.test)
+    androidLibrary {
+        namespace = "com.dshatz.pdfmp"
+        compileSdk = 36
+        minSdk = 24
+
+        optimization {
+            this.consumerKeepRules.file(project.file("consumer-rules.pro"))
+        }
+
+        withDeviceTestBuilder {
+            sourceSetTreeName = "test"
+        }.configure {
+            this.instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
     }
 
     val androidTargets = addAndroidNativeTargets(nativeTargets)
@@ -216,6 +223,17 @@ kotlin {
         configureOptional("androidNativeMain") {
             dependsOn(getByName("nativeJniMain"))
         }
+
+        val (consumerMain, consumerTest) = createMainAndTest(
+            name = "consumer",
+            parent = "common"
+        )
+
+        val (consumerJniMain, consumerJniTest) = createMainAndTest(
+            name = "consumerJni",
+            parent = "consumer",
+            "jvm", "android", "androidDevice"
+        )
         val (nonAndroidConsumerMain, nonAndroidConsumerTest) = createMainAndTest("nonAndroidConsumer", "consumer", "jvm", "ios")
         nonAndroidConsumerMain.dependencies {
             implementation(libs.skiko)
@@ -226,6 +244,12 @@ kotlin {
             implementation(libs.coroutines.test)
             implementation(libs.test.core)
             implementation(libs.test.kotest)
+        }
+        named("androidDeviceTest") {
+            dependencies {
+                implementation(libs.test.core)
+                implementation("androidx.test:runner:1.7.0")
+            }
         }
         jvmTest.dependencies {
             val skikoVersion = libs.versions.skiko.get()
@@ -269,9 +293,11 @@ fun NamedDomainObjectContainer<KotlinSourceSet>.createMainAndTest(name: String, 
 val packageAndroidNatives = tasks.register<Copy>("packageAndroidNatives") {
     group = "build"
     description = "Aggregates all native libs for Android packaging."
-    val outputDir = layout.buildDirectory.dir("generated/jniLibs")
+    val outputDir = layout.projectDirectory.dir("src/androidMain/jniLibs")
     into(outputDir)
 }
+
+tasks.named("androidPreBuild").dependsOn(packageAndroidNatives)
 
 kotlin.targets.withType<KotlinNativeTarget>().configureEach {
     val target = this
@@ -279,9 +305,10 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
 
     if (androidLibPath != null) {
         val abi = androidLibPath.substringAfter("android/")
-        val prebuiltSourceFolder = androidLibPath
 
-        target.binaries.withType<SharedLibrary>().configureEach {
+        target.binaries.withType<SharedLibrary>().matching {
+            it.buildType == nativeBuildType
+        }.configureEach {
             val binary = this
             packageAndroidNatives.configure {
                 dependsOn(binary.linkTaskProvider)
@@ -292,7 +319,7 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
             }
         }
 
-        val prebuiltDir = rootProject.project("pdfium-binaries").file("binaries/$prebuiltSourceFolder")
+        val prebuiltDir = rootProject.project("pdfium-binaries").file("binaries/$androidLibPath")
         packageAndroidNatives.configure {
             if (prebuiltDir.exists()) {
                 from(prebuiltDir) {
@@ -305,29 +332,10 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
     }
 }
 
-android {
-    namespace = "com.dshatz.pdfmp"
-    compileSdk = 36
-    defaultConfig {
-        minSdk = 24
-        consumerProguardFiles(project.file("consumer-rules.pro"))
-    }
 
-    sourceSets.getByName("main") {
-        jniLibs.srcDir(packageAndroidNatives.map { it.destinationDir })
-    }
-
-    libraryVariants.configureEach {
-        preBuildProvider.configure {
-            dependsOn(packageAndroidNatives)
-        }
-    }
-}
-
-
-fun registerNativeResources(taskName: String, buildType: String) = tasks.register<Sync>(taskName) {
+fun bundleDesktopNativeLibs(buildType: NativeBuildType) = tasks.register<Sync>("bundleDesktop${buildType.name.capitalized()}Libs") {
     group = "build"
-    val outputDir = layout.buildDirectory.dir("generated/native-libs/$buildType")
+    val outputDir = layout.buildDirectory.dir("generated/native-libs/${buildType.name}")
     into(outputDir)
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
@@ -354,19 +362,20 @@ fun registerNativeResources(taskName: String, buildType: String) = tasks.registe
     }
 }
 
-val generateDebugResources = registerNativeResources("generateDebugNativeResources", "debug")
-val generateReleaseResources = registerNativeResources("generateReleaseNativeResources", "release")
+val useDebugNatives = (project.findProperty("debug") as? String)?.toBoolean() ?: false
+val nativeBuildType = if (useDebugNatives) NativeBuildType.DEBUG else NativeBuildType.RELEASE
+val bundleDesktopLibs = bundleDesktopNativeLibs(nativeBuildType)
 
 kotlin.sourceSets.getByName("jvmTest") {
-    resources.srcDir(generateDebugResources)
+    resources.srcDir(bundleDesktopLibs)
 }
 
 tasks.named<Jar>("jvmJar") {
-    from(generateReleaseResources)
+    from(bundleDesktopLibs)
 }
 
 tasks.withType<JavaExec>().configureEach {
-    classpath += files(generateDebugResources)
+    classpath += files(bundleDesktopLibs)
 }
 
 dependencies {

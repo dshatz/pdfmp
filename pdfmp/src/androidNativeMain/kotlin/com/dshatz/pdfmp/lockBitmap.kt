@@ -18,13 +18,14 @@ import platform.android.AndroidBitmap_getInfo
 import platform.android.AndroidBitmap_lockPixels
 import platform.android.AndroidBitmap_unlockPixels
 import platform.android.JNIEnvVar
+import platform.android.jclass
 import platform.android.jobject
 import platform.android.jvalue
 import kotlin.experimental.ExperimentalNativeApi
 
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
 @CName("Java_com_dshatz_pdfmp_ConsumerBufferUtil_lockBitmap")
-fun lockBitmap(env: CPointer<JNIEnvVar>, thiz: jobject, bitmap: jobject): jobject? {
+fun lockBitmap(env: CPointer<JNIEnvVar>, thiz: jclass, bitmap: jobject): jobject? {
     memScoped {
         val jni = env.pointed.pointed ?: return null
 

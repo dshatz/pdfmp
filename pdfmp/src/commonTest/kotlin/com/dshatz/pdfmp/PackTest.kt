@@ -3,6 +3,7 @@ package com.dshatz.pdfmp
 import com.dshatz.pdfmp.model.BufferDimensions
 import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.RenderRequest
+import de.infix.testBalloon.framework.core.TestSuite
 import de.infix.testBalloon.framework.core.testSuite
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.assertions.throwables.shouldThrow
@@ -14,6 +15,10 @@ import kotlinx.io.readByteArray
 import kotlin.random.Random
 
 val PackTests by testSuite {
+    packTests()
+}
+
+fun TestSuite.packTests() {
     test("pack page transform") {
         val input = randomPageTransform()
         val buffer = Buffer()

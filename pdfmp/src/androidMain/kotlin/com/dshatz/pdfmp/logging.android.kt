@@ -2,7 +2,7 @@ package com.dshatz.pdfmp
 
 import android.util.Log
 
-actual fun isDebug(): Boolean = isAndroidDebug()
+actual fun isDebug(): Boolean = PDFMP.enableLogs
 internal actual fun logPlatform(level: LogLevel, tag: String, message: String) {
     when (level) {
         LogLevel.VERBOSE -> Log.v(tag, message)

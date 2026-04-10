@@ -45,13 +45,11 @@ fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
         useJUnitPlatform()
     }
     tasks.withType<KotlinJvmTest>().configureEach {
-        logger.lifecycle("UP-TO-DATE check for $name is disabled, forcing it to run.")
         outputs.upToDateWhen { false }
         ignoreFailures = true
     }
 
     tasks.withType<KotlinTest>() {
-        logger.lifecycle("UP-TO-DATE check for $name is disabled, forcing it to run.")
         outputs.upToDateWhen { false }
         ignoreFailures = true
     }
@@ -64,16 +62,13 @@ fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
         val buildDirectory = layout.buildDirectory
 
         val jvmMain = kotlin.targets.getByName("jvm").compilations.getByName("main")
-        nativeTargets.forEach { targetName: String ->
+        nativeTargets.forEach {
             runCatching {
-                logger.lifecycle("Wiring tests for $targetName")
-                val target = kotlin.targets.getByName(targetName)
+                val target = kotlin.targets.getByName(it)
                 val compilation = target.compilations.getByName("main")
                 val testTask = "${target.name}Test"
                 dependsOn(tasks.matching { it.name == testTask })
                 classDirectories.from(compilation.output.classesDirs)
-            }.onFailure {
-                logger.warn("Could not wire test: $targetName, reason: $it")
             }
         }
         classDirectories.from(jvmMain.output.classesDirs)
