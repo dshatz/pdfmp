@@ -2,6 +2,8 @@ name: "Upload test results"
 inputs:
   platform:
     required: true
+  kotlinTarget:
+    requred: true
 runs:
   using: "composite"
   steps:
@@ -10,5 +12,5 @@ runs:
       with:
         name: test-report-${{ inputs.platform }}
         path: |
-          **/build/test-results/**/*.xml
+          **/build/test-results/${{inputs.kotlinTarget}}Test/*.xml
           android-results/**/*.xml

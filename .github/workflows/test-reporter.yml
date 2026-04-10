@@ -8,17 +8,9 @@ on:
       artifact_name:
         required: true
         type: string
-      test_run_id:
-        required: true
-        type: string
       pr_number:
         required: false
         type: string
-    secrets:
-      REPORT_APP_KEY:
-        required: true
-      REPORT_APP_ID:
-        required: true
 
 jobs:
   report:
@@ -28,7 +20,6 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ inputs.test_run_id }}
 
       - name: Get PR Number from Run ID
         id: get_pr
@@ -37,17 +28,10 @@ jobs:
           PR_NUMBER=$(cat pr_number.txt/pr_number.txt)
           echo "nr=$PR_NUMBER" >> $GITHUB_OUTPUT
 
-      - name: Generate Token
-        uses: actions/create-github-app-token@v3
-        id: app-token
-        with:
-          app-id: ${{ secrets.REPORT_APP_ID }}
-          private-key: ${{ secrets.REPORT_APP_KEY }}
-
       - name: Publish ${{ inputs.platform_name }} Test Results
         uses: dshatz/github-test-reporter@main
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           report-path: "${{ inputs.artifact_name }}/**/*.xml"
           status-check: true

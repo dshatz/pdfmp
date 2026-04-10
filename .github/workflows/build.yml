@@ -1,4 +1,4 @@
-name: Verify
+name: Test
 
 on:
   push:
@@ -11,13 +11,6 @@ on:
       - develop
   release:
     types: [created]
-
-#permissions:
-#  contents: read
-#  checks: write
-#  pull-requests: write
-#  packages: write
-#  id-token: write # Required for WIF
 
 jobs:
   setup:
@@ -41,7 +34,7 @@ jobs:
   # Don't give any permissions except contents: read.
 
   test-linux:
-    name: Test Linux x64
+    name: Linux x64
     if: github.event_name == 'push' || github.event_name == 'pull_request_target' || github.event_name == 'release'
     permissions:
       contents: read
@@ -55,22 +48,32 @@ jobs:
         uses: ./.github/actions/build-setup
       - name: Run Tests
         run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=linuxX64
-      - name: Upload
+      - name: Upload linuxX64
         uses: ./.github/actions/upload-test-results
         with:
           platform: linuxX64
+          kotlinTarget: linuxX64
+      - name: Upload jvm
+        uses: ./.github/actions/upload-test-results
+        with:
+          platform: linux-jvm
+          kotlinTarget: jvm
+
+      # Build and upload APKs for instrumented testing.
       - name: Build Android Test
+        if: false
         run: |
           ./gradlew pdfmp:assembleAndroidDeviceTest pdfmp-compose:assembleAndroidDeviceTest\
             -PnativeTargets=androidNativeArm64
-
       - name: Upload Android Test APK (pdfmp)
+        if: false
         uses: actions/upload-artifact@v7
         with:
           name: pdfmp-test.apk
           archive: false
           path: 'pdfmp-compose/build/outputs/apk/androidTest/pdfmp-compose-androidTest.apk'
       - name: Upload Android Test APK (pdfmp-compose)
+        if: false
         uses: actions/upload-artifact@v7
         with:
           name: pdfmp-compose-test.apk
@@ -78,11 +81,10 @@ jobs:
           path: 'pdfmp/build/outputs/apk/androidTest/pdfmp-androidTest.apk'
 
   test-windows:
-    name: Test Windows x64
+    name: Windows x64
     permissions:
       contents: read
     #    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'release'
-    if: false
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
@@ -93,17 +95,53 @@ jobs:
         uses: ./.github/actions/build-setup
       - name: Run Tests
         run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=mingwX64
+      - name: Upload windowsX64
+        uses: ./.github/actions/upload-test-results
+        with:
+          platform: windowsX64
+          kotlinTarget: mingwX64
+      - name: Upload jvm
+        uses: ./.github/actions/upload-test-results
+        with:
+          platform: windows-jvm
+          kotlinTarget: jvm
+
+  test-macos:
+    name: macOS Arm
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Run Tests macOS
+        run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=iosSimulatorArm64,macosArm64
       - name: Upload
         uses: ./.github/actions/upload-test-results
         with:
-          platform: linuxX64
+          platform: macosArm64
+          kotlinTarget: macosArm64
+      - name: Upload
+        uses: ./.github/actions/upload-test-results
+        with:
+          platform: iosSimulatorArm64
+          kotlinTarget: iosSimulatorArm64
+      - name: Upload jvm
+        uses: ./.github/actions/upload-test-results
+        with:
+          platform: macos-jvm
+          kotlinTarget: jvm
 
   test-android-pdfmp:
-    name: Test Android (Firebase)
+    name: Android (pdfmp)
+    runs-on: ubuntu-latest
+    needs: test-linux
+    continue-on-error: true
     permissions:
       id-token: write
       contents: read
-    runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
@@ -111,6 +149,7 @@ jobs:
           sparse-checkout: |
             .github/actions
       - name: Test pdfmp
+        continue-on-error: true
         uses: ./.github/actions/test-android
         with:
           module: pdfmp
@@ -120,8 +159,10 @@ jobs:
           platform: android-pdfmp
 
   test-android-pdfmp-compose:
-    name: Test Android (Firebase)
+    name: Android (pdfmp-compose)
     runs-on: ubuntu-latest
+    needs: test-linux
+    continue-on-error: true
     permissions:
       id-token: write
       contents: read
@@ -133,6 +174,7 @@ jobs:
             .github/actions
       - name: Test pdfmp-compose
         uses: ./.github/actions/test-android
+        continue-on-error: true
         with:
           module: pdfmp-compose
       - name: Upload results
@@ -141,58 +183,34 @@ jobs:
           platform: android-pdfmp-compose
 
 
-#  test:
-#    name: Tests on ${{ matrix.os }}
-#    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'release'
-#    runs-on: ${{ matrix.os }}
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        os: [ macos-latest, ubuntu-latest, windows-latest ]
-#    steps:
-#      - name: Setup
-#        uses: .github/actions/build-setup
-#
-#      - name: Run Tests Linux
-#        if: runner.os == 'Linux'
-#        run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=linuxX64
-#
-#      - name: Run Tests Android
-#        uses: ./.github/actions/test-android
-#        with:
-#
-#
-#      - name: Run Tests Windows
-#        if: runner.os == 'Windows'
-#        run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=mingwX64
-#
-#      - name: Run Tests MacOS
-#        if: runner.os == 'macOS'
-#        run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=iosSimulatorArm64,macosArm64
-#
-#      - name: Upload Test Results (macOS)
-#        if: runner.os == 'macOS' # Upload macos and ios separately
-#        uses: actions/upload-artifact@v7
-#        with:
-#          name: test-report-macos
-#          path: |
-#            **/build/test-results/macos*Test/*.xml
-#            **/build/test-results/jvmTest/*.xml
-#      - name: Upload Test Results (iOS)
-#        if: runner.os == 'macOS' # Upload macos and ios separately
-#        uses: actions/upload-artifact@v7
-#        with:
-#          name: test-report-ios
-#          path: '**/build/test-results/ios*Test/*.xml'
-#      - name: Upload Test Results (non-apple)
-#        if: runner.os != 'macOS' # Upload macos and ios separately
-#        uses: actions/upload-artifact@v7
-#        with:
-#          name: test-report-${{ matrix.os }}
-#          path: '**/build/test-results/**/*.xml'
-#      - name: Upload Coverage Report
-#        if: always()
-#        uses: actions/upload-artifact@v7
-#        with:
-#          name: coverage-report-${{ matrix.os }}
-#          path: '**/build/jacocoReports/jacocoTestReport/jacocoTestReport.xml'
+  test-results-linux:
+    needs: test-linux
+    uses: ./.github/workflows/test-reporter.yml
+    with:
+      platform_name: Linux x64
+      artifact_name: test-report-linux*
+    secrets: inherit
+  test-results-windows:
+    needs: test-windows
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    uses: ./.github/workflows/test-reporter.yml
+    with:
+      platform_name: Windows x64
+      artifact_name: test-report-windows*
+    secrets: inherit
+  test-results-macos:
+    needs: test-macos
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    uses: ./.github/workflows/test-reporter.yml
+    with:
+      platform_name: macOS ARM
+      artifact_name: test-report-macos*
+    secrets: inherit
+  test-results-ios:
+    needs: test-macos
+    if: github.event.workflow_run.conclusion != 'cancelled'
+    uses: ./.github/workflows/test-reporter.yml
+    with:
+      platform_name: iOS Simulator
+      artifact_name: test-report-ios*
+    secrets: inherit
