@@ -42,7 +42,7 @@ actual class ConsumerBuffer(
 }
 
 actual object ConsumerBufferUtil {
-    private external fun lockBitmap(bitmap: Bitmap): BufferInfo
+    external fun lockBitmap(bitmap: Bitmap): BufferInfo
     external fun unlockBitmap(bitmap: Bitmap)
     actual fun allocate(size: SizeB, width: Int, height: Int): ConsumerBuffer {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)

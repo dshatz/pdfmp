@@ -232,7 +232,7 @@ kotlin {
         val (consumerJniMain, consumerJniTest) = createMainAndTest(
             name = "consumerJni",
             parent = "consumer",
-            "jvm", "android"
+            "jvm", "android", "androidDevice"
         )
         val (nonAndroidConsumerMain, nonAndroidConsumerTest) = createMainAndTest("nonAndroidConsumer", "consumer", "jvm", "ios")
         nonAndroidConsumerMain.dependencies {
@@ -245,11 +245,12 @@ kotlin {
             implementation(libs.test.core)
             implementation(libs.test.kotest)
         }
-        /*getByName("androidDeviceTest") {
+        named("androidDeviceTest") {
             dependencies {
+                implementation(libs.test.core)
                 implementation("androidx.test:runner:1.7.0")
             }
-        }*/
+        }
         jvmTest.dependencies {
             val skikoVersion = libs.versions.skiko.get()
 

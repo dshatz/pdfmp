@@ -35,6 +35,12 @@ kotlin {
         namespace = "com.dshatz.pdfmp.compose"
         compileSdk = 36
         minSdk = 24
+
+        withDeviceTestBuilder {
+            sourceSetTreeName = "test"
+        }.configure {
+            this.instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
     }
     jvm()
 
@@ -65,6 +71,10 @@ kotlin {
         jvmTest.dependencies {
             implementation(libs.coroutines.test)
             implementation("io.mockk:mockk:1.14.6")
+        }
+        named("androidDeviceTest").dependencies {
+            implementation(libs.test.core)
+            implementation("androidx.test:runner:1.7.0")
         }
     }
     configureTests(this)
