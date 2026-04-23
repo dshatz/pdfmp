@@ -290,6 +290,7 @@ fun NamedDomainObjectContainer<KotlinSourceSet>.createMainAndTest(name: String, 
     return main to test
 }
 
+
 val packageAndroidNatives = tasks.register<Copy>("packageAndroidNatives") {
     group = "build"
     description = "Aggregates all native libs for Android packaging."
@@ -298,6 +299,8 @@ val packageAndroidNatives = tasks.register<Copy>("packageAndroidNatives") {
 }
 
 tasks.named("androidPreBuild").dependsOn(packageAndroidNatives)
+val useDebugNatives = (project.findProperty("debug") as? String)?.toBoolean() ?: false
+val nativeBuildType = if (useDebugNatives) NativeBuildType.DEBUG else NativeBuildType.RELEASE
 
 kotlin.targets.withType<KotlinNativeTarget>().configureEach {
     val target = this
@@ -361,9 +364,6 @@ fun bundleDesktopNativeLibs(buildType: NativeBuildType) = tasks.register<Sync>("
         }
     }
 }
-
-val useDebugNatives = (project.findProperty("debug") as? String)?.toBoolean() ?: false
-val nativeBuildType = if (useDebugNatives) NativeBuildType.DEBUG else NativeBuildType.RELEASE
 val bundleDesktopLibs = bundleDesktopNativeLibs(nativeBuildType)
 
 kotlin.sourceSets.getByName("jvmTest") {
