@@ -48,32 +48,26 @@ jobs:
         uses: ./.github/actions/build-setup
       - name: Run Tests
         run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=linuxX64 -Pdebug=true
-      - name: Upload linuxX64
-        uses: ./.github/actions/upload-test-results
+
+      - name: Upload Artifact
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          platform: linuxX64
-          kotlinTarget: linuxX64
-      - name: Upload jvm
-        uses: ./.github/actions/upload-test-results
-        with:
-          platform: linux-jvm
-          kotlinTarget: jvm
+          name: test-report-ubuntu-latest
+          path: ./**/build/test-results/**/*.xml
 
       # Build and upload APKs for instrumented testing.
       - name: Build Android Test
-        if: false
         run: |
           ./gradlew pdfmp:assembleAndroidDeviceTest pdfmp-compose:assembleAndroidDeviceTest\
             -PnativeTargets=androidNativeArm64 -Pdebug=true
       - name: Upload Android Test APK (pdfmp)
-        if: false
         uses: actions/upload-artifact@v7
         with:
           name: pdfmp-test.apk
           archive: false
           path: 'pdfmp-compose/build/outputs/apk/androidTest/pdfmp-compose-androidTest.apk'
       - name: Upload Android Test APK (pdfmp-compose)
-        if: false
         uses: actions/upload-artifact@v7
         with:
           name: pdfmp-compose-test.apk
@@ -95,16 +89,12 @@ jobs:
         uses: ./.github/actions/build-setup
       - name: Run Tests
         run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=mingwX64 -Pdebug=true
-      - name: Upload windowsX64
-        uses: ./.github/actions/upload-test-results
+      - name: Upload Artifact
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          platform: windowsX64
-          kotlinTarget: mingwX64
-      - name: Upload jvm
-        uses: ./.github/actions/upload-test-results
-        with:
-          platform: windows-jvm
-          kotlinTarget: jvm
+          name: test-report-windows-latest
+          path: ./**/build/test-results/**/*.xml
 
   test-macos:
     name: macOS Arm
@@ -118,21 +108,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Run Tests macOS
         run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=iosSimulatorArm64,macosArm64 -Pdebug=true
-      - name: Upload
-        uses: ./.github/actions/upload-test-results
+      - name: Upload Artifact
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          platform: macosArm64
-          kotlinTarget: macosArm64
-      - name: Upload
-        uses: ./.github/actions/upload-test-results
-        with:
-          platform: iosSimulatorArm64
-          kotlinTarget: iosSimulatorArm64
-      - name: Upload jvm
-        uses: ./.github/actions/upload-test-results
-        with:
-          platform: macos-jvm
-          kotlinTarget: jvm
+          name: test-report-macos-latest
+          path: ./**/build/test-results/**/*.xml
 
   test-android-pdfmp:
     name: Android (pdfmp)
@@ -153,10 +134,12 @@ jobs:
         uses: ./.github/actions/test-android
         with:
           module: pdfmp
-      - name: Upload results
-        uses: ./.github/actions/upload-test-results
+      - name: Upload Artifact
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          platform: android-pdfmp
+          name: test-report-ubuntu-android-pdfmp
+          path: ./**/build/test-results/**/*.xml
 
   test-android-pdfmp-compose:
     name: Android (pdfmp-compose)
@@ -177,48 +160,42 @@ jobs:
         continue-on-error: true
         with:
           module: pdfmp-compose
-      - name: Upload results
-        uses: ./.github/actions/upload-test-results
+      - name: Upload Artifact
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
-          platform: android-pdfmp-compose
+          name: test-report-ubuntu-android-pdfmp-compose
+          path: ./**/build/test-results/**/*.xml
 
 
-  test-results-linux:
-    needs: test-linux
+  test-results:
+    needs:
+     - test-linux
+     - test-macos
+     - test-windows
+     - test-android-pdfmp
+     - test-android-pdfmp-compose
+    if: always()
+    runs-on: ubuntu-latest
     permissions:
+      contents: read
       checks: write
-    uses: ./.github/workflows/test-reporter.yml
-    with:
-      platform_name: Linux x64
-      artifact_name: test-report-linux*
-    secrets: inherit
-  test-results-windows:
-    needs: test-windows
-    permissions:
-      checks: write
-    if: github.event.workflow_run.conclusion != 'cancelled'
-    uses: ./.github/workflows/test-reporter.yml
-    with:
-      platform_name: Windows x64
-      artifact_name: test-report-windows*
-    secrets: inherit
-  test-results-macos:
-    permissions:
-      checks: write
-    needs: test-macos
-    if: github.event.workflow_run.conclusion != 'cancelled'
-    uses: ./.github/workflows/test-reporter.yml
-    with:
-      platform_name: macOS ARM
-      artifact_name: test-report-macos*
-    secrets: inherit
-  test-results-ios:
-    permissions:
-      checks: write
-    needs: test-macos
-    if: github.event.workflow_run.conclusion != 'cancelled'
-    uses: ./.github/workflows/test-reporter.yml
-    with:
-      platform_name: iOS Simulator
-      artifact_name: test-report-ios*
-    secrets: inherit
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            .github/actions
+      - name: Download Artifacts
+        uses: actions/download-artifact@v8
+      - name: Test Report
+        uses: dshatz/testballoon-github-reporter@master
+        with:
+          reports: "test-report-*/**/*.xml"
+          platform-hints: |
+            {
+              "test-report-ubuntu-latest/**/*.xml": "Linux",
+              "test-report-windows-latest/**/*.xml": "Windows",
+              "test-report-macos-latest/**/*.xml": "macOS",
+              "test-report-ubuntu-android-*/**/*.xml": "Android"
+            }
