@@ -18,7 +18,7 @@ fun pdfResource(path: Path): PdfSource.PdfPath {
 
 @Composable
 fun asyncPdfResource(load: suspend () -> ByteArray): State<PdfSource.PdfBytes?> {
-    return produceState<PdfSource.PdfBytes?>(null, load) {
+    return produceState(null, load) {
         value = PdfSource.PdfBytes(load())
     }
 }

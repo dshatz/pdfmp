@@ -1,53 +1,17 @@
 package com.dshatz.pdfmp.model
 
-import com.dshatz.pdfmp.model.BufferInfo.Companion.pack
-import com.dshatz.pdfmp.packList
-import com.dshatz.pdfmp.unpackList
+import com.dshatz.kni.annotations.JniSerializable
+import com.dshatz.pdfmp.PageDimensions
 import kotlinx.io.Buffer
-import kotlinx.io.readByteArray
 
+@JniSerializable
 data class RenderRequest(
-    val transforms: List<PageTransform>,
-    val pageSpacing: Int,
-    val topOffset: Int,
+    val page: Int,
+    val dimensions: PageDimensions,
     val bufferInfo: BufferInfo,
-) {
-    fun pack(): ByteArray {
-        val buffer = Buffer()
-        transforms.packList(
-            buffer,
-            packItem = PageTransform::pack
-        )
-        buffer.writeInt(pageSpacing)
-        buffer.writeInt(topOffset)
-        bufferInfo.pack(buffer)
+)
 
-        return buffer.readByteArray()
-    }
-
-    companion object {
-        fun unpack(data: ByteArray): RenderRequest {
-            val buffer = Buffer()
-            buffer.write(data)
-            val imageTransforms = unpackList(
-                buffer,
-                unpackItem = PageTransform::unpack
-            )
-
-            val pageSpacing = buffer.readInt()
-            val topOffset = buffer.readInt()
-            val bufferInfo = BufferInfo.unpack(buffer)
-
-            return RenderRequest(
-                imageTransforms,
-                pageSpacing,
-                topOffset,
-                bufferInfo
-            )
-        }
-    }
-}
-
+@JniSerializable
 data class BufferDimensions(
     val width: Int,
     val height: Int,
@@ -58,6 +22,7 @@ data class BufferDimensions(
     }
 }
 
+@JniSerializable
 data class BufferInfo(
     val dimensions: BufferDimensions,
     val address: Long,

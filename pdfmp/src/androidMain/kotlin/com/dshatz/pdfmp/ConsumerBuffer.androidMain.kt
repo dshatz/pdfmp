@@ -1,6 +1,7 @@
 package com.dshatz.pdfmp
 
 import android.graphics.Bitmap
+import android.graphics.Picture
 import com.dshatz.pdfmp.model.BufferDimensions
 import com.dshatz.pdfmp.model.BufferInfo
 import com.dshatz.pdfmp.model.SizeB
@@ -14,7 +15,13 @@ actual class ConsumerBuffer(
     actual override val dimensions: BufferDimensions = bufferInfo.dimensions
 
     actual override suspend fun <T> withAddress(action: suspend (Long) -> T): T? {
-        return action(bufferInfo.address)
+        try {
+            val info = ConsumerBufferUtil.lockBitmap(androidBitmap)
+            return action(info.address)
+        } finally {
+            ConsumerBufferUtil.unlockBitmap(androidBitmap)
+        }
+
     }
 
     actual override fun capacity(): SizeB {
@@ -47,6 +54,7 @@ actual object ConsumerBufferUtil {
     actual fun allocate(size: SizeB, width: Int, height: Int): ConsumerBuffer {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val info = lockBitmap(bitmap)
+        unlockBitmap(bitmap)
         return ConsumerBuffer(
             bitmap,
             info

@@ -1,6 +1,9 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
 import com.android.build.gradle.internal.tasks.factory.dependsOn
+import com.dshatz.kni.bundlesNatives
+import com.dshatz.kni.bundlesPrebuiltNatives
+import com.dshatz.kni.gettingOptional
 import com.dshatz.pdfmp.buildlogic.*
 import com.dshatz.pdfmp.buildlogic.configureTests
 import com.dshatz.pdfmp.buildlogic.nativeTargets
@@ -16,6 +19,7 @@ plugins {
     alias(libs.plugins.mp)
     alias(libs.plugins.ksp)
     alias(libs.plugins.publish)
+    alias(libs.plugins.kni)
     alias(libs.plugins.android.lib)
     alias(libs.plugins.testballoon)
     jacoco
@@ -23,6 +27,12 @@ plugins {
 
 group = "com.dshatz"
 version = project.findProperty("version") as? String ?: "0.1.0-SNAPSHOT1"
+
+kni {
+    autoWire {
+        kspDependency.set(libs.jni.ksp)
+    }
+}
 
 // Map KMP target names to standard pdfium lib folder.
 private val desktopTargetMap = mapOf(
@@ -40,7 +50,7 @@ private val androidArchMap = mapOf(
     "androidNativeX86"   to "android/x86"
 )
 
-fun KotlinNativeTarget.setUpPdfiumCinterop() {
+fun KotlinNativeTarget.setupPdfiumCinterop() {
     val targetName = name
     compilations.getByName("main").cinterops {
         create("pdfium") {
@@ -67,7 +77,6 @@ fun KotlinNativeTarget.setUpPdfiumCinterop() {
 private fun KotlinNativeTarget.setupSharedLib() {
     val androidLib = androidArchMap[name]
     val pdfiumPath = androidLib ?: name
-    val targetName = name
 
     binaries {
         sharedLib {
@@ -84,11 +93,7 @@ private fun KotlinNativeTarget.setupSharedLib() {
         val binariesModuleDir = project(":pdfium-binaries").projectDir
         linkerOpts.add("-L$binariesModuleDir/binaries/$pdfiumPath")
         linkerOpts.add("-lpdfium")
-
-        // Without this we'd link against libcrypt.so.1 unnecessarily and that's
-        // not even available in a flatpak.
-        // See https://youtrack.jetbrains.com/projects/KT/issues/KT-55643
-        if (targetName.contains("linux")) linkerOpts.add("-Wl,--as-needed")
+        if (name.contains("linux")) linkerOpts.add("-lcrypt")
     }
 
     binaries {
@@ -150,37 +155,25 @@ fun KotlinNativeTarget.setupIosFramework() {
     }
 }
 
-kotlin {
-    applyDefaultHierarchyTemplate {
-        common {
-            group("native") {
-                /* more groups created in sourceSets block below */
-                group("nativeJni") {
-                    group("desktopNativeJni") {
-                        withLinux()
-                        withMingw()
-                        withMacos()
-                    }
-                    withAndroidNative()
-                }
-                group("nativeNonJni") {
-                    withIos()
-                }
-            }
-        }
+fun KotlinNativeTarget.androidLinkerOpts() {
+    binaries.all {
+        // Force the linker to use 16KB alignment
+        linkerOpts("-z", "max-page-size=16384")
+        linkerOpts("-z", "common-page-size=16384")
+        linkerOpts("-Wl,--allow-shlib-undefined")
     }
+}
+
+kotlin {
+    applyDefaultHierarchyTemplate()
     jvmToolchain(21)
-    jvm()
-    android {
+    androidLibrary {
         namespace = "com.dshatz.pdfmp"
         compileSdk = 36
         minSdk = 24
 
         optimization {
-            this.consumerKeepRules.apply {
-                file(project.file("consumer-rules.pro"))
-                publish = true
-            }
+            this.consumerKeepRules.file(project.file("consumer-rules.pro"))
         }
 
         withDeviceTestBuilder {
@@ -190,36 +183,58 @@ kotlin {
         }
     }
 
-    val androidTargets = addAndroidNativeTargets(nativeTargets)
-    androidTargets.forEach {
-        it.setUpPdfiumCinterop()
-        it.setupSharedLib()
-    }
+    optionalTargets {
+        val androidTargets = listOfNotNull(
+            androidNativeX86(),
+            androidNativeX64(),
+            androidNativeArm32(),
+            androidNativeArm64()
+        )
+        configure(androidTargets) {
+            setupPdfiumCinterop()
+            setupSharedLib()
+            androidLinkerOpts()
+        }
 
-    configure(androidTargets) {
-        binaries.all {
-            // Force the linker to use 16KB alignment
-            linkerOpts("-z", "max-page-size=16384")
-            linkerOpts("-z", "common-page-size=16384")
-            linkerOpts("-Wl,--allow-shlib-undefined")
+        val iosTargets = listOfNotNull(
+            iosX64(),
+            iosArm64(),
+            iosSimulatorArm64()
+        )
+        configure(iosTargets) {
+            setupPdfiumCinterop()
+            setupSharedLib()
+            setupIosFramework()
         }
     }
 
-
-    // Desktop Native Targets
-    if ("linuxX64" in nativeTargets) linuxX64 { setUpPdfiumCinterop(); setupSharedLib() }
-    if ("linuxArm64" in nativeTargets) linuxArm64 { setUpPdfiumCinterop(); setupSharedLib() }
-    if ("mingwX64" in nativeTargets) mingwX64 { setUpPdfiumCinterop(); setupSharedLib() }
-    if ("macosArm64" in nativeTargets) macosArm64 { setUpPdfiumCinterop(); setupSharedLib() }
-    if ("macosX64" in nativeTargets) macosX64 { setUpPdfiumCinterop(); setupSharedLib() }
-
-    // iOS Targets
-    val iosTargets = addIosTargets(nativeTargets)
-    iosTargets.forEach {
-        it.setUpPdfiumCinterop()
-        it.setupSharedLib()
-        it.setupIosFramework()
+    val desktopTargets = optionalTargets.run {
+        listOfNotNull(
+            linuxX64(),
+            linuxArm64(),
+            mingwX64(),
+            macosArm64(),
+            macosX64()
+        )
     }
+    configure(desktopTargets) {
+        setupPdfiumCinterop()
+        setupSharedLib()
+    }
+
+    jvm {
+        this bundlesNatives desktopTargets
+        bundlesPrebuiltNatives {
+            project.rootProject.layout.projectDirectory.dir("pdfium-binaries").dir("binaries").apply {
+                linuxX64 = listOf(dir("linuxX64"))
+                linuxArm64 = listOf(dir("linuxArm64"))
+                mingwX64 = listOf(dir("mingwX64"))
+                macosX64 = listOf(dir("macosX64"))
+                macosArm64 = listOf(dir("macosArm64"))
+            }
+        }
+    }
+
 
     sourceSets {
         commonMain.dependencies {
@@ -227,15 +242,16 @@ kotlin {
             implementation(libs.coroutines)
             implementation(libs.jni.annotations)
             implementation(libs.jni.buffers)
+            implementation(libs.jni.serialization)
         }
-        getByName("nativeJniMain") {
+        val jniCommonMain by getting {
             dependencies {
-                implementation(libs.jni)
+                api(libs.jni)
             }
         }
-        configureOptional("androidNativeMain") {
+        /*configureOptional("androidNativeMain") {
             dependsOn(getByName("nativeJniMain"))
-        }
+        }*/
 
         val (consumerMain, consumerTest) = createMainAndTest(
             name = "consumer",
@@ -246,6 +262,11 @@ kotlin {
             name = "consumerJni",
             parent = "consumer",
             "jvm", "android", "androidDevice"
+        )
+        val (desktopNativeMain, desktopNativeTest) = createMainAndTest(
+            name = "desktopNative",
+            parent = "jniNative",
+            "linux", "macos", "mingw"
         )
         val (nonAndroidConsumerMain, nonAndroidConsumerTest) = createMainAndTest("nonAndroidConsumer", "consumer", "jvm", "ios")
         nonAndroidConsumerMain.dependencies {
@@ -281,11 +302,6 @@ kotlin {
                 else -> "x64"
             }
             implementation("org.jetbrains.skiko:skiko-awt-runtime-$targetOs-$targetArch:$skikoVersion")
-        }
-        val nativeJniMain by getting {
-            dependencies {
-//                implementation(project(":native-tools"))
-            }
         }
     }
     compilerOptions {
@@ -354,7 +370,7 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
 }
 
 
-fun bundleDesktopNativeLibs(buildType: NativeBuildType) = tasks.register<Sync>("bundleDesktop${buildType.name.capitalized()}Libs") {
+/*fun bundleDesktopNativeLibs(buildType: NativeBuildType) = tasks.register<Sync>("bundleDesktop${buildType.name.capitalized()}Libs") {
     group = "build"
     val outputDir = layout.buildDirectory.dir("generated/native-libs/${buildType.name}")
     into(outputDir)
@@ -381,8 +397,8 @@ fun bundleDesktopNativeLibs(buildType: NativeBuildType) = tasks.register<Sync>("
             }
         }
     }
-}
-val bundleDesktopLibs = bundleDesktopNativeLibs(nativeBuildType)
+}*/
+/*val bundleDesktopLibs = bundleDesktopNativeLibs(nativeBuildType)
 
 kotlin.sourceSets.getByName("jvmTest") {
     resources.srcDir(bundleDesktopLibs)
@@ -390,17 +406,12 @@ kotlin.sourceSets.getByName("jvmTest") {
 
 tasks.named<Jar>("jvmJar") {
     from(bundleDesktopLibs)
-}
+}*/
 
-tasks.withType<JavaExec>().configureEach {
+/*tasks.withType<JavaExec>().configureEach {
     classpath += files(bundleDesktopLibs)
-}
+}*/
 
-dependencies {
-    nativeTargets.forEach {
-        add("ksp${it.capitalized()}", libs.jni.ksp)
-    }
-}
 
 mavenPublishing {
     signAllPublications()
