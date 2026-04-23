@@ -45,5 +45,5 @@ runs:
     - name: Download Results
       shell: bash
       run: |
-        mkdir -p firebase-results
+        mkdir -p android-results/${{inputs.module}}
         gcloud storage cp -r "gs://pdfmp-firebase-test/run-${{ github.run_id }}/**/test_result_*.xml" ./android-results/${{inputs.module}}/
