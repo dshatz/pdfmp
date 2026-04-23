@@ -31,13 +31,19 @@ val macOsTargets = listOf(
     "macosArm64"
 )
 
+val iosTargets = listOf(
+    "iosX64",
+    "iosArm64",
+    "iosSimulatorArm64"
+)
+
 private val windowsTargets = listOf(
     "mingwX64"
 )
 
 val Project.nativeTargets get() = run {
     val nativeTargets: String? by project
-    nativeTargets?.split(',') ?: (linuxTargets + macOsTargets + windowsTargets + androidTargets)
+    nativeTargets?.split(',') ?: (linuxTargets + macOsTargets + windowsTargets + androidTargets + iosTargets)
 }
 
 fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
