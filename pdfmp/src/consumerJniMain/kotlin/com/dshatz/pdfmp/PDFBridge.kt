@@ -24,10 +24,6 @@ object PDFBridge {
      */
     external fun getPageCount(renderer: PdfRendererPtr): ByteArray
 
-    /**
-     * @return packed List<Float> - page ratios for pages.
-     */
-//    external fun getPageRatios(renderer: PdfRendererPtr): ByteArray
     external fun getAspectRatio(renderer: PdfRendererPtr, pageIndex: Int): ByteArray
     external fun render(renderer: PdfRendererPtr, reqBytes: ByteArray): ByteArray
     external fun renderAsync(renderer: PdfRendererPtr, reqBytes: ByteArray, callback: RenderCallback)
