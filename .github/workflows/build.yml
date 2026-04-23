@@ -106,6 +106,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Setup
+        uses: ./.github/actions/build-setup
       - name: Run Tests macOS
         run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=iosSimulatorArm64,macosArm64 -Pdebug=true
       - name: Upload Artifact
@@ -130,16 +132,33 @@ jobs:
           sparse-checkout: |
             .github/actions
       - name: Test pdfmp
-        continue-on-error: true
+        id: run_firebase
         uses: ./.github/actions/test-android
         with:
           module: pdfmp
+          gcloud_auth: ${{secrets.GCLOUD_AUTH}}
+      - name: Download Results
+        shell: bash
+        env:
+          module: pdfmp
+        if: always()
+        run: |
+          mkdir -p android-results/$module
+          gcloud storage cp -r "gs://pdfmp-firebase-test/run-${{ github.run_id }}/**/test_result_*.xml" $GITHUB_WORKSPACE/android-results/$module/
       - name: Upload Artifact
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-report-ubuntu-android-pdfmp
-          path: ./android-results/**.xml
+          path: android-results/**.xml
+      - name: Report Failure
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.run_firebase.outcome }}" == "failure" ]]; then
+            echo "There were failing tests, marking job as failed."
+            exit 1
+          fi
 
   test-android-pdfmp-compose:
     name: Android (pdfmp-compose)
@@ -157,15 +176,32 @@ jobs:
             .github/actions
       - name: Test pdfmp-compose
         uses: ./.github/actions/test-android
-        continue-on-error: true
+        id: run_firebase
         with:
           module: pdfmp-compose
+          gcloud_auth: ${{secrets.GCLOUD_AUTH}}
+      - name: Download Results
+        shell: bash
+        env:
+          module: pdfmp-compose
+        if: always()
+        run: |
+          mkdir -p android-results/$module
+          gcloud storage cp -r "gs://pdfmp-firebase-test/run-${{ github.run_id }}/**/test_result_*.xml" $GITHUB_WORKSPACE/android-results/$module/
       - name: Upload Artifact
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-report-ubuntu-android-pdfmp-compose
           path: ./android-results/**.xml
+      - name: Report Failure
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.run_firebase.outcome }}" == "failure" ]]; then
+            echo "There were failing tests, marking job as failed."
+            exit 1
+          fi
 
 
   test-results:
