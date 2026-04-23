@@ -22,6 +22,7 @@ sealed class DisplayState {
 @Stable
 class PdfLayoutInfo internal constructor(
     private val getOffsetY: () -> Float,
+    private val getOffsetX: () -> Float,
     private val setOffsetY: (Float) -> Unit,
     private val getPageOffsetY: (pageIdx: Int) -> Float,
     private val getVisiblePages: () -> List<VisiblePageInfo>,
@@ -38,12 +39,19 @@ class PdfLayoutInfo internal constructor(
         setOffsetY(getPageOffsetY(pageIdx))
     }
 
+    internal fun pageOffsetY(idx: Int) = derivedStateOf {
+        getPageOffsetY(idx)
+    }
+
     /**
      * Scroll offset in pixels from the top of the document to the top of the current viewport.
      */
     var offsetY: Float
         get() = getOffsetY()
         set(value) = setOffsetY(value)
+
+    internal val offsetX: Float
+        get() = getOffsetX()
 
     private val animatableScroll = Animatable(0f)
     suspend fun animateScrollTo(

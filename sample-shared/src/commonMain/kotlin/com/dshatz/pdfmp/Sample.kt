@@ -47,7 +47,6 @@ import com.dshatz.pdfmp.compose.state.rememberPdfState
 import com.dshatz.pdfmp.compose.state.zoomPercents
 import com.dshatz.pdfmp.sample.Res
 import com.dshatz.pdfmp.sample.ic_doc
-import com.dshatz.pdfmp.source.CustomSourceDescriptor
 import com.dshatz.pdfmp.source.PdfSource
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.launch
@@ -288,8 +287,9 @@ private fun MissingDoc() {
 
 @Composable
 private fun NetworkFile() {
+    val networkSource = remember { NetworkPdfSourceAdapter("https://www.princexml.com/samples/icelandic/dictionary.pdf", HttpClient()) }
     val pdf = rememberPdfState(
-        NetworkPdfSourceAdapter("https://www.princexml.com/samples/icelandic/dictionary.pdf", HttpClient()),
+        networkSource,
 //        NetworkPdfSourceAdapter("https://file-examples.com/storage/fe7c74cc10698a50e99ed2d/2017/10/file-example_PDF_1MB.pdf", HttpClient()),
         pageSpacing = 50.dp
     )
