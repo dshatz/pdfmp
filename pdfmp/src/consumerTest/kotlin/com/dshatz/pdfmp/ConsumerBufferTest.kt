@@ -24,7 +24,7 @@ val consumerBufferTest by testSuite {
 
             val buffer = pool.getBufferPage(transform)
             buffer.withAddress {
-                it shouldBeGreaterThan 0
+                it.toULong() shouldBeGreaterThan 0u
             }
             pool.totalBufferMemory shouldBe bufferSize
             buffer.free()
