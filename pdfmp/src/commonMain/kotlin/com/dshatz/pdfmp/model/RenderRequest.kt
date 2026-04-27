@@ -11,42 +11,7 @@ data class RenderRequest(
     val pageSpacing: Int,
     val topOffset: Int,
     val bufferInfo: BufferInfo,
-) {
-    fun pack(): ByteArray {
-        val buffer = Buffer()
-        transforms.packList(
-            buffer,
-            packItem = PageTransform::pack
-        )
-        buffer.writeInt(pageSpacing)
-        buffer.writeInt(topOffset)
-        bufferInfo.pack(buffer)
-
-        return buffer.readByteArray()
-    }
-
-    companion object {
-        fun unpack(data: ByteArray): RenderRequest {
-            val buffer = Buffer()
-            buffer.write(data)
-            val imageTransforms = unpackList(
-                buffer,
-                unpackItem = PageTransform::unpack
-            )
-
-            val pageSpacing = buffer.readInt()
-            val topOffset = buffer.readInt()
-            val bufferInfo = BufferInfo.unpack(buffer)
-
-            return RenderRequest(
-                imageTransforms,
-                pageSpacing,
-                topOffset,
-                bufferInfo
-            )
-        }
-    }
-}
+)
 
 data class BufferDimensions(
     val width: Int,

@@ -2,7 +2,6 @@ package com.dshatz.pdfmp
 
 import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.model.RenderResponse
-import com.dshatz.pdfmp.source.CustomSourceDescriptor
 import com.dshatz.pdfmp.source.PdfSource
 
 expect class PdfRenderer {

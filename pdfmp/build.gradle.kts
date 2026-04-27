@@ -16,6 +16,7 @@ plugins {
     alias(libs.plugins.mp)
     alias(libs.plugins.ksp)
     alias(libs.plugins.publish)
+    alias(libs.plugins.kni)
     alias(libs.plugins.android.lib)
     alias(libs.plugins.testballoon)
     jacoco
@@ -23,6 +24,12 @@ plugins {
 
 group = "com.dshatz"
 version = project.findProperty("version") as? String ?: "0.1.0-SNAPSHOT1"
+
+kni {
+    autoWire {
+        kspDependency.set(libs.jni.ksp)
+    }
+}
 
 // Map KMP target names to standard pdfium lib folder.
 private val desktopTargetMap = mapOf(
@@ -40,7 +47,7 @@ private val androidArchMap = mapOf(
     "androidNativeX86"   to "android/x86"
 )
 
-fun KotlinNativeTarget.setUpPdfiumCinterop() {
+fun KotlinNativeTarget.setupPdfiumCinterop() {
     val targetName = name
     compilations.getByName("main").cinterops {
         create("pdfium") {
@@ -145,6 +152,15 @@ fun KotlinNativeTarget.setupIosFramework() {
     }
 }
 
+fun KotlinNativeTarget.androidLinkerOpts() {
+    binaries.all {
+        // Force the linker to use 16KB alignment
+        linkerOpts("-z", "max-page-size=16384")
+        linkerOpts("-z", "common-page-size=16384")
+        linkerOpts("-Wl,--allow-shlib-undefined")
+    }
+}
+
 kotlin {
     applyDefaultHierarchyTemplate {
         common {
@@ -182,36 +198,43 @@ kotlin {
         }
     }
 
-    val androidTargets = addAndroidNativeTargets(nativeTargets)
-    androidTargets.forEach {
-        it.setUpPdfiumCinterop()
-        it.setupSharedLib()
-    }
+    optionalTargets {
+        val androidTargets = listOfNotNull(
+            androidNativeX86(),
+            androidNativeX64(),
+            androidNativeArm32(),
+            androidNativeArm64()
+        )
+        configure(androidTargets) {
+            setupPdfiumCinterop()
+            setupSharedLib()
+            androidLinkerOpts()
+        }
 
-    configure(androidTargets) {
-        binaries.all {
-            // Force the linker to use 16KB alignment
-            linkerOpts("-z", "max-page-size=16384")
-            linkerOpts("-z", "common-page-size=16384")
-            linkerOpts("-Wl,--allow-shlib-undefined")
+        val desktopTargets = listOfNotNull(
+            linuxX64(),
+            linuxArm64(),
+            mingwX64(),
+            macosArm64(),
+            macosX64()
+        )
+        configure(desktopTargets) {
+            setupPdfiumCinterop()
+            setupSharedLib()
+        }
+
+        val iosTargets = listOfNotNull(
+            iosX64(),
+            iosArm64(),
+            iosSimulatorArm64()
+        )
+        configure(iosTargets) {
+            setupPdfiumCinterop()
+            setupSharedLib()
+            setupIosFramework()
         }
     }
 
-
-    // Desktop Native Targets
-    if ("linuxX64" in nativeTargets) linuxX64 { setUpPdfiumCinterop(); setupSharedLib() }
-    if ("linuxArm64" in nativeTargets) linuxArm64 { setUpPdfiumCinterop(); setupSharedLib() }
-    if ("mingwX64" in nativeTargets) mingwX64 { setUpPdfiumCinterop(); setupSharedLib() }
-    if ("macosArm64" in nativeTargets) macosArm64 { setUpPdfiumCinterop(); setupSharedLib() }
-    if ("macosX64" in nativeTargets) macosX64 { setUpPdfiumCinterop(); setupSharedLib() }
-
-    // iOS Targets
-    val iosTargets = addIosTargets(nativeTargets)
-    iosTargets.forEach {
-        it.setUpPdfiumCinterop()
-        it.setupSharedLib()
-        it.setupIosFramework()
-    }
 
     sourceSets {
         commonMain.dependencies {
@@ -220,7 +243,12 @@ kotlin {
             implementation(libs.jni.annotations)
             implementation(libs.jni.buffers)
         }
-        getByName("nativeJniMain") {
+        /*getByName("nativeJniMain") {
+            dependencies {
+                implementation(libs.jni)
+            }
+        }*/
+        getByName("jniCommonMain") {
             dependencies {
                 implementation(libs.jni)
             }
@@ -388,11 +416,6 @@ tasks.withType<JavaExec>().configureEach {
     classpath += files(bundleDesktopLibs)
 }
 
-dependencies {
-    nativeTargets.forEach {
-        add("ksp${it.capitalized()}", libs.jni.ksp)
-    }
-}
 
 mavenPublishing {
     signAllPublications()

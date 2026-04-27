@@ -1,8 +1,8 @@
 package com.dshatz.pdfmp
 
-import com.dshatz.kni.annotations.CallableFromNative
+import com.dshatz.kni.annotations.JniCallback
 
-@CallableFromNative
+@JniCallback
 interface RenderCallback: AutoCloseable {
     fun onSuccess(result: ByteArray)
     fun onFailure(message: String)

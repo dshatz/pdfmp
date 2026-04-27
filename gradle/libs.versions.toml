@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.3.0"
-jni = "2.0.5-SNAPSHOT"
+jni = "1.0.1-SNAPSHOT"
 agp = "9.0.1"
 filepicker = "0.12.0"
 publish = "0.35.0"
@@ -22,7 +22,7 @@ compose = { id = "org.jetbrains.compose", version = "1.10.0" }
 atomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version = "0.30.0" }
 publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
 testballoon = { id = "de.infix.testBalloon", version.ref = "testballoon" }
-osdetector = { id = "com.google.osdetector", version.ref = "osdetect" }
+kni = { id = "com.dshatz.kni", version.ref = "jni" }
 
 [libraries]
 jni = { module = "com.dshatz.kni:jni", version.ref = "jni" }

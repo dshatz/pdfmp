@@ -2,21 +2,13 @@
 
 package com.dshatz.pdfmp
 
-import com.dshatz.kni.annotations.JNIConnect
-import com.dshatz.pdfmp.PDFBridgeConst.CLASS_NAME
-import com.dshatz.pdfmp.PDFBridgeConst.PACKAGE_NAME
-import com.dshatz.pdfmp.model.RenderRequest
-import com.dshatz.pdfmp.model.RenderResponse
-import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
-import com.dshatz.pdfmp.source.PdfSource
-import kotlinx.cinterop.*
-import kotlinx.coroutines.runBlocking
-import kotlinx.io.Buffer
-import kotlinx.io.readByteArray
-import kotlinx.io.writeFloat
+import kotlinx.cinterop.COpaque
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.asStableRef
+import kotlinx.cinterop.toCPointer
 
 
-private fun <T> returnResult(
+/*private fun <T> returnResult(
     result: Result<T>,
     packData: Buffer.(T) -> Unit,
 ): ByteArray  {
@@ -84,7 +76,7 @@ fun getAspectRatio(rendererPtr: PdfRendererPtr, pageIndex: Int): ByteArray {
     return returnResult(rendererPtr.getRenderer().getPageRatio(pageIndex), { writeFloat(it) })
 }
 
-/*@JNIConnect(
+*//*@JNIConnect(
     packageName = PACKAGE_NAME,
     className = CLASS_NAME,
     functionName = "render"
@@ -96,7 +88,7 @@ fun render(renderer: PdfRendererPtr, reqBytes: ByteArray): ByteArray = runBlocki
         renderer.render(req),
         RenderResponse::pack
     )
-}*/
+}*//*
 
 @JNIConnect(
     packageName = PACKAGE_NAME,
@@ -116,7 +108,7 @@ fun renderAsync(renderer: PdfRendererPtr, reqBytes: ByteArray, callback: RenderC
 )
 fun close(renderer: PdfRendererPtr) {
     renderer.getRenderer().close()
-}
+}*/
 
 fun PdfRendererPtr.getRenderer(): PdfRenderer {
     return runCatching {

@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 plugins {
     alias(libs.plugins.mp)
     alias(libs.plugins.compose)
+    alias(libs.plugins.kni)
     alias(libs.plugins.compose.kt)
     alias(libs.plugins.android.lib)
     alias(libs.plugins.atomicfu)
@@ -25,18 +26,20 @@ kotlin {
         compileSdk = 36
         minSdk = 24
     }
-    val iosTargets = buildList {
-        if ("iosX64" in nativeTargets) add(iosX64())
-        if ("iosArm64" in nativeTargets) add(iosArm64())
-        if ("iosSimulatorArm64" in nativeTargets) add(iosSimulatorArm64())
-    }
 
-    val xcf = XCFramework()
-    iosTargets.forEach {
-        it.binaries.framework {
-            baseName = "pdfmpcompose"
-            xcf.add(this)
-            export(project(":pdfmp-compose"))
+    optionalTargets {
+        val iosTargets = listOfNotNull(
+            iosX64(),
+            iosArm64(),
+            iosSimulatorArm64()
+        )
+        val xcf = XCFramework()
+        configure(iosTargets) {
+            binaries.framework {
+                baseName = "pdfmpcompose"
+                xcf.add(this)
+                export(project(":pdfmp-compose"))
+            }
         }
     }
 

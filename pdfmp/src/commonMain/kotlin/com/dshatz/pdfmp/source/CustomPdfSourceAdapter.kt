@@ -1,9 +1,9 @@
 package com.dshatz.pdfmp.source
 
-import com.dshatz.kni.annotations.CallableFromNative
+import com.dshatz.kni.annotations.JniCallback
 import com.dshatz.kni.buffers.ByteBuffer
 
-@CallableFromNative
+@JniCallback
 interface CustomPdfSourceAdapter: AutoCloseable {
 
     fun getDocumentLength(): Long

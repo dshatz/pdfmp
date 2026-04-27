@@ -98,20 +98,3 @@ fun NamedDomainObjectContainer<KotlinSourceSet>.configureOptional(name: String, 
         getByName(name).configure()
     }
 }
-
-fun KotlinMultiplatformExtension.addIosTargets(nativeTargets: List<String>): List<KotlinNativeTarget> {
-    return buildList {
-        if ("iosX64" in nativeTargets) add(iosX64())
-        if ("iosArm64" in nativeTargets) add(iosArm64())
-        if ("iosSimulatorArm64" in nativeTargets) add(iosSimulatorArm64())
-    }
-}
-
-fun KotlinMultiplatformExtension.addAndroidNativeTargets(nativeTargets: List<String>): List<KotlinNativeTarget> {
-    return buildList {
-        if ("androidNativeX86" in nativeTargets) add(androidNativeX86())
-        if ("androidNativeX64" in nativeTargets) add(androidNativeX64())
-        if ("androidNativeArm32" in nativeTargets) add(androidNativeArm32())
-        if ("androidNativeArm64" in nativeTargets) add(androidNativeArm64())
-    }
-}

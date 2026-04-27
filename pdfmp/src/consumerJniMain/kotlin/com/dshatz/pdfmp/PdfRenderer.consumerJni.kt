@@ -2,13 +2,11 @@ package com.dshatz.pdfmp
 
 import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.model.RenderResponse
-import com.dshatz.pdfmp.source.CustomSourceDescriptor
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.io.Buffer
 import kotlinx.io.readFloat
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 actual class PdfRenderer(private val renderer: PdfRendererPtr) {
     
@@ -29,14 +27,6 @@ actual class PdfRenderer(private val renderer: PdfRendererPtr) {
 
         }
         PDFBridge.renderAsync(renderer, packed, callback)
-        /*return runCatching {
-            val packed = renderRequest.pack()
-            val response = unpackResult(
-                PDFBridge.render(renderer,packed),
-                RenderResponse::unpack
-            )
-            response.getOrThrow()
-        }*/
     }
 
     actual fun close() {

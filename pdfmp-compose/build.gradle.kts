@@ -1,8 +1,9 @@
 @file:OptIn(ExperimentalComposeLibrary::class, ExperimentalKotlinGradlePluginApi::class)
 
-import com.dshatz.pdfmp.buildlogic.addIosTargets
 import com.dshatz.pdfmp.buildlogic.configureTests
+import com.dshatz.pdfmp.buildlogic.iosTargets
 import com.dshatz.pdfmp.buildlogic.nativeTargets
+import com.gradle.scan.agent.serialization.scan.serializer.kryo.it
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
@@ -14,6 +15,7 @@ plugins {
     alias(libs.plugins.testballoon)
     alias(libs.plugins.ksp) // for testballoon
     alias(libs.plugins.android.lib)
+    alias(libs.plugins.kni)
     alias(libs.plugins.publish)
     jacoco
 }
@@ -44,14 +46,19 @@ kotlin {
     }
     jvm()
 
-    val iosTargets = addIosTargets(nativeTargets)
-
-    val xcf = XCFramework()
-    iosTargets.forEach {
-        it.binaries.framework {
-            baseName = "pdfmpcompose"
-            export(project(":pdfmp"))
-            xcf.add(this)
+    optionalTargets {
+        val iosTargets = listOfNotNull(
+            iosX64(),
+            iosArm64(),
+            iosSimulatorArm64()
+        )
+        val xcf = XCFramework()
+        configure(iosTargets) {
+            binaries.framework {
+                baseName = "pdfmpcompose"
+                export(project(":pdfmp"))
+                xcf.add(this)
+            }
         }
     }
 
