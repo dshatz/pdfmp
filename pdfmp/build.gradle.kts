@@ -162,13 +162,16 @@ kotlin {
     }
     jvmToolchain(21)
     jvm()
-    androidLibrary {
+    android {
         namespace = "com.dshatz.pdfmp"
         compileSdk = 36
         minSdk = 24
 
         optimization {
-            this.consumerKeepRules.file(project.file("consumer-rules.pro"))
+            this.consumerKeepRules.apply {
+                file(project.file("consumer-rules.pro"))
+                publish = true
+            }
         }
 
         withDeviceTestBuilder {

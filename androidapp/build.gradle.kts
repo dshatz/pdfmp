@@ -17,7 +17,9 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = buildTypes.getByName("debug").signingConfig
+            proguardFiles("rules.pro")
         }
     }
 }
