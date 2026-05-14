@@ -31,7 +31,7 @@ kotlin {
         }
     }
     jvmToolchain(21)
-    androidLibrary {
+    android {
         namespace = "com.dshatz.pdfmp.compose"
         compileSdk = 36
         minSdk = 24
