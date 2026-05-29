@@ -9,10 +9,13 @@ import kotlin.use
 actual class InitLib {
     private val osName = System.getProperty("os.name").lowercase(Locale.ENGLISH)
     private val osArch = System.getProperty("os.arch").lowercase(Locale.ENGLISH)
+    
+    var overrideLoadLibrary: (name: String) -> Unit = ::loadLibraryFromJar
+    
     actual fun init() {
         try {
-            loadLibraryFromJar("pdfium")
-            loadLibraryFromJar("pdfmp")
+            overrideLoadLibrary("pdfium")
+            overrideLoadLibrary("pdfmp")
             PDFBridge.initNative()
         } catch (e: UnsatisfiedLinkError) {
             e("Failed to load native library", e)
@@ -20,6 +23,16 @@ actual class InitLib {
     }
 
     private fun loadLibraryFromJar(baseName: String) {
+        // Detect Flatpak sandbox
+        if ((osName.contains("nux") || osName.contains("nix")) && File("/.flatpak-info").exists()) {
+            try {
+                System.loadLibrary(baseName)
+                return
+            } catch (e: Throwable) {
+                // Ignore
+            }
+        }
+
         val (platformDir, extension, prefix) = getPlatformDetails()
 
         val fileName = "${prefix}${baseName}.${extension}"
