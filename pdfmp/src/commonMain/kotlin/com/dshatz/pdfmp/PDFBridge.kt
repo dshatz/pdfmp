@@ -3,6 +3,7 @@ package com.dshatz.pdfmp
 import com.dshatz.kni.annotations.JniCall
 import com.dshatz.pdfmp.model.RenderRequest
 
+/*
 expect object PDFBridge {
     @JniCall
     fun renderAsync(
@@ -19,4 +20,4 @@ expect object PDFBridge {
 
     @JniCall
     fun initNative()
-}
+}*/

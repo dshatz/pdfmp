@@ -1,6 +1,9 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
 import com.android.build.gradle.internal.tasks.factory.dependsOn
+import com.dshatz.kni.bundlesNatives
+import com.dshatz.kni.bundlesPrebuiltNatives
+import com.dshatz.kni.gettingOptional
 import com.dshatz.pdfmp.buildlogic.*
 import com.dshatz.pdfmp.buildlogic.configureTests
 import com.dshatz.pdfmp.buildlogic.nativeTargets
@@ -162,10 +165,11 @@ fun KotlinNativeTarget.androidLinkerOpts() {
 }
 
 kotlin {
-    applyDefaultHierarchyTemplate {
+    applyDefaultHierarchyTemplate()
+    /*applyDefaultHierarchyTemplate {
         common {
             group("native") {
-                /* more groups created in sourceSets block below */
+                *//* more groups created in sourceSets block below *//*
                 group("nativeJni") {
                     group("desktopNativeJni") {
                         withLinux()
@@ -179,9 +183,8 @@ kotlin {
                 }
             }
         }
-    }
+    }*/
     jvmToolchain(21)
-    jvm()
     androidLibrary {
         namespace = "com.dshatz.pdfmp"
         compileSdk = 36
@@ -211,18 +214,6 @@ kotlin {
             androidLinkerOpts()
         }
 
-        val desktopTargets = listOfNotNull(
-            linuxX64(),
-            linuxArm64(),
-            mingwX64(),
-            macosArm64(),
-            macosX64()
-        )
-        configure(desktopTargets) {
-            setupPdfiumCinterop()
-            setupSharedLib()
-        }
-
         val iosTargets = listOfNotNull(
             iosX64(),
             iosArm64(),
@@ -235,6 +226,33 @@ kotlin {
         }
     }
 
+    val desktopTargets = optionalTargets.run {
+        listOfNotNull(
+            linuxX64(),
+            linuxArm64(),
+            mingwX64(),
+            macosArm64(),
+            macosX64()
+        )
+    }
+    configure(desktopTargets) {
+        setupPdfiumCinterop()
+        setupSharedLib()
+    }
+
+    jvm {
+        this bundlesNatives desktopTargets
+        bundlesPrebuiltNatives {
+            project.rootProject.layout.projectDirectory.dir("pdfium-binaries").dir("binaries").apply {
+                linuxX64 = listOf(dir("linuxX64"))
+                linuxArm64 = listOf(dir("linuxArm64"))
+                mingwX64 = listOf(dir("mingwX64"))
+                macosX64 = listOf(dir("macosX64"))
+                macosArm64 = listOf(dir("macosArm64"))
+            }
+        }
+    }
+
 
     sourceSets {
         commonMain.dependencies {
@@ -242,20 +260,16 @@ kotlin {
             implementation(libs.coroutines)
             implementation(libs.jni.annotations)
             implementation(libs.jni.buffers)
+            implementation(libs.jni.serialization)
         }
-        /*getByName("nativeJniMain") {
-            dependencies {
-                implementation(libs.jni)
-            }
-        }*/
-        getByName("jniCommonMain") {
+        val jniCommonMain by getting {
             dependencies {
                 implementation(libs.jni)
             }
         }
-        configureOptional("androidNativeMain") {
+        /*configureOptional("androidNativeMain") {
             dependsOn(getByName("nativeJniMain"))
-        }
+        }*/
 
         val (consumerMain, consumerTest) = createMainAndTest(
             name = "consumer",
@@ -266,6 +280,11 @@ kotlin {
             name = "consumerJni",
             parent = "consumer",
             "jvm", "android", "androidDevice"
+        )
+        val (desktopNativeMain, desktopNativeTest) = createMainAndTest(
+            name = "desktopNative",
+            parent = "jniNative",
+            "linux", "macos", "mingw"
         )
         val (nonAndroidConsumerMain, nonAndroidConsumerTest) = createMainAndTest("nonAndroidConsumer", "consumer", "jvm", "ios")
         nonAndroidConsumerMain.dependencies {
@@ -301,11 +320,6 @@ kotlin {
                 else -> "x64"
             }
             implementation("org.jetbrains.skiko:skiko-awt-runtime-$targetOs-$targetArch:$skikoVersion")
-        }
-        val nativeJniMain by getting {
-            dependencies {
-//                implementation(project(":native-tools"))
-            }
         }
     }
     compilerOptions {
@@ -374,7 +388,7 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
 }
 
 
-fun bundleDesktopNativeLibs(buildType: NativeBuildType) = tasks.register<Sync>("bundleDesktop${buildType.name.capitalized()}Libs") {
+/*fun bundleDesktopNativeLibs(buildType: NativeBuildType) = tasks.register<Sync>("bundleDesktop${buildType.name.capitalized()}Libs") {
     group = "build"
     val outputDir = layout.buildDirectory.dir("generated/native-libs/${buildType.name}")
     into(outputDir)
@@ -401,8 +415,8 @@ fun bundleDesktopNativeLibs(buildType: NativeBuildType) = tasks.register<Sync>("
             }
         }
     }
-}
-val bundleDesktopLibs = bundleDesktopNativeLibs(nativeBuildType)
+}*/
+/*val bundleDesktopLibs = bundleDesktopNativeLibs(nativeBuildType)
 
 kotlin.sourceSets.getByName("jvmTest") {
     resources.srcDir(bundleDesktopLibs)
@@ -410,11 +424,11 @@ kotlin.sourceSets.getByName("jvmTest") {
 
 tasks.named<Jar>("jvmJar") {
     from(bundleDesktopLibs)
-}
+}*/
 
-tasks.withType<JavaExec>().configureEach {
+/*tasks.withType<JavaExec>().configureEach {
     classpath += files(bundleDesktopLibs)
-}
+}*/
 
 
 mavenPublishing {

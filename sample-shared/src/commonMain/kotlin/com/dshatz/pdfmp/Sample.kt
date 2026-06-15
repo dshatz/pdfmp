@@ -47,7 +47,6 @@ import com.dshatz.pdfmp.compose.state.rememberPdfState
 import com.dshatz.pdfmp.compose.state.zoomPercents
 import com.dshatz.pdfmp.sample.Res
 import com.dshatz.pdfmp.sample.ic_doc
-import com.dshatz.pdfmp.source.CustomSourceDescriptor
 import com.dshatz.pdfmp.source.PdfSource
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.launch

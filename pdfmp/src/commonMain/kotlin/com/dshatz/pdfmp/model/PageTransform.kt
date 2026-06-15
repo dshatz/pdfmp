@@ -1,10 +1,12 @@
 package com.dshatz.pdfmp.model
 
+import com.dshatz.kni.annotations.JniSerializable
 import kotlinx.io.Buffer
 import kotlinx.io.readFloat
 import kotlinx.io.writeFloat
 import kotlin.math.max
 
+@JniSerializable
 data class PageTransform(
     val pageIndex: Int,
     val topCutoff: Int,

@@ -19,4 +19,6 @@ interface CustomPdfSourceAdapter: AutoCloseable {
 
     fun setError(error: String?)
     fun getLastError(): String?
+
+    override fun close()
 }

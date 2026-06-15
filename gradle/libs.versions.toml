@@ -1,8 +1,7 @@
 [versions]
 kotlin = "2.3.0"
-jni = "1.0.1-SNAPSHOT"
+jni = "1.0.2-SNAPSHOT"
 agp = "9.0.1"
-filepicker = "0.12.0"
 publish = "0.35.0"
 skiko = "0.9.22.2"
 kotest = "6.1.0"
@@ -16,7 +15,7 @@ jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 android-lib = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 android-lib-mp = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 android-app = { id = "com.android.application", version.ref = "agp" }
-ksp = { id = "com.google.devtools.ksp", version = "2.3.6" }
+ksp = { id = "com.google.devtools.ksp", version = "2.3.7" }
 compose-kt = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 compose = { id = "org.jetbrains.compose", version = "1.10.0" }
 atomicfu = { id = "org.jetbrains.kotlinx.atomicfu", version = "0.30.0" }
@@ -27,6 +26,7 @@ kni = { id = "com.dshatz.kni", version.ref = "jni" }
 [libraries]
 jni = { module = "com.dshatz.kni:jni", version.ref = "jni" }
 jni-buffers = { module = "com.dshatz.kni:buffers", version.ref = "jni" }
+jni-serialization = { module = "com.dshatz.kni:serialization", version.ref = "jni" }
 jni-ksp = { module = "com.dshatz.kni:ksp", version.ref = "jni" }
 jni-annotations = { module = "com.dshatz.kni:annotations", version.ref = "jni" }
 io = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version = "0.8.2" }
@@ -42,7 +42,7 @@ skiko = { module = "org.jetbrains.skiko:skiko", version.ref = "skiko" }
 
 # Android
 appcompat = { module = "androidx.appcompat:appcompat", version = "1.7.1" }
-activity-compose = { module = "androidx.activity:activity-compose", version = "1.12.2" }
+activity-compose = { module = "androidx.activity:activity-compose", version = "1.13.0" }
 
-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.10.2" }
-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version = "1.10.2" }
+coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.11.0" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version = "1.11.0" }

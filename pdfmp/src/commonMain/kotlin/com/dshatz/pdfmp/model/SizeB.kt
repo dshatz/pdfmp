@@ -1,8 +1,10 @@
 package com.dshatz.pdfmp.model
 
+import com.dshatz.kni.annotations.JniSerializable
 import kotlin.jvm.JvmInline
 
 @JvmInline
+@JniSerializable
 value class SizeB(val bytes: Long): Comparable<SizeB> {
     val stringMB: String get() {
         return "${bytes / 1024 / 1024} MB"

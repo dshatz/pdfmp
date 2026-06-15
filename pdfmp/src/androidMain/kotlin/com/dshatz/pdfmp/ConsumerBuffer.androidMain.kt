@@ -1,6 +1,7 @@
 package com.dshatz.pdfmp
 
 import android.graphics.Bitmap
+import android.graphics.Picture
 import com.dshatz.pdfmp.model.BufferDimensions
 import com.dshatz.pdfmp.model.BufferInfo
 import com.dshatz.pdfmp.model.SizeB

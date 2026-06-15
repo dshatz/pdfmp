@@ -6,7 +6,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ColorMatrixColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import com.dshatz.pdfmp.compose.CurrentImage
 import com.dshatz.pdfmp.model.calculateSize

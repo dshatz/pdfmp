@@ -4,7 +4,6 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import com.dshatz.pdfmp.PdfRenderer
 import com.dshatz.pdfmp.compose.state.PdfState
 import com.dshatz.pdfmp.compose.state.VisiblePageInfo
 import com.dshatz.pdfmp.source.PdfSource

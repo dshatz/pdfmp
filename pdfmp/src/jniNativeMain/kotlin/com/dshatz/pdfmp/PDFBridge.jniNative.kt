@@ -6,6 +6,7 @@ import kotlinx.cinterop.COpaque
 import kotlinx.cinterop.asStableRef
 import kotlinx.cinterop.toCPointer
 
+/*
 actual object PDFBridge {
     @JniCall
     actual fun renderAsync(
@@ -48,4 +49,4 @@ actual object PDFBridge {
     @JniCall
     actual fun initNative() {
     }
-}
+}*/

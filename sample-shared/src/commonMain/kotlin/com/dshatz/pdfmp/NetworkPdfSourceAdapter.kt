@@ -54,7 +54,7 @@ class NetworkPdfSourceAdapter(
             )
             bytesCopied += toCopy
         }
-        buffer.put(result)
+        buffer.write(result)
         bytesCopied
     }
 

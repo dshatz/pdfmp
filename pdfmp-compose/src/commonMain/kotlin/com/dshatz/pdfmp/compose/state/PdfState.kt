@@ -15,11 +15,17 @@ import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.model.RenderResponse
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
-import com.dshatz.pdfmp.source.CustomSourceDescriptor
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.coroutines.*
 import kotlin.math.min
 import kotlin.time.ExperimentalTime
+import kotlin.time.measureTime
+
+
+@Composable
+fun InitLibEffect() {
+    InitLib().init()
+}
 
 @Composable
 fun rememberPdfState(
@@ -27,9 +33,15 @@ fun rememberPdfState(
     pageRange: IntRange = 0..Int.MAX_VALUE,
     pageSpacing: Dp = 0.dp
 ): PdfState {
+    InitLibEffect()
     val scope = rememberCoroutineScope()
     val pageSpacingPx = with(LocalDensity.current) { pageSpacing.toPx().toInt() }
-    val state = remember { PdfState(pdfSource, pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
+    val renderer by remember(pdfSource) {
+        derivedStateOf {
+            PdfRenderer(pdfSource)
+        }
+    }
+    val state = remember { PdfState(renderer, pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
     state.OpenDisposableDocument()
     return state
 }
@@ -40,24 +52,28 @@ fun rememberPdfState(
     pageRange: IntRange = 0..Int.MAX_VALUE,
     pageSpacing: Dp = 0.dp
 ): PdfState {
-    return rememberPdfState(
-        pdfSource = PdfSource.Custom(CustomSourceDescriptor(customPdfSourceAdapter)),
-        pageRange = pageRange,
-        pageSpacing = pageSpacing
-    )
+    InitLibEffect()
+    val scope = rememberCoroutineScope()
+    val renderer by remember(customPdfSourceAdapter) {
+        derivedStateOf {
+            PdfRenderer(customPdfSourceAdapter)
+        }
+    }
+    val pageSpacingPx = with(LocalDensity.current) { pageSpacing.toPx().toInt() }
+    val state = remember { PdfState(renderer, pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
+    state.OpenDisposableDocument()
+    return state
 }
 
 @OptIn(ExperimentalTime::class)
 data class PdfState(
-    val pdfSource: PdfSource,
+    private val renderer: PdfRenderer,
     internal val pageRange: IntRange = 0..Int.MAX_VALUE,
     private val scale: MutableState<Float> = mutableFloatStateOf(1f),
     internal val viewport: MutableState<Size> = mutableStateOf(Size(1f, 1f)),
     val pageSpacing: Int = 0,
     private val scope: CoroutineScope
 ) {
-    private lateinit var renderer: PdfRenderer
-
 
     /**
      * The state of the LazyColumn with page placeholders.
@@ -356,7 +372,7 @@ data class PdfState(
 
         val buffer = bufferPool.getBufferViewport(transforms)
         return buffer.withAddress {
-                val response = renderer.render(
+                val response = renderer.renderSuspend(
                     RenderRequest(
                         transforms,
                         pageSpacing,
@@ -437,13 +453,10 @@ data class PdfState(
 
     @Composable
     internal fun OpenDisposableDocument() {
-        InitLib().init()
-        LaunchedEffect(pdfSource) {
+        LaunchedEffect(renderer) {
             try {
                 withContext(Dispatchers.Default) {
-                    val rendererResult = PdfRendererFactory.createFromSource(pdfSource)
-                    rendererResult.mapCatching { renderer ->
-                        this@PdfState.renderer = renderer
+                    renderer.openDocument().mapCatching {
                         bufferPool = ConsumerBufferPool()
                     }.onFailure {
                         d("Failed to open document: $it")
@@ -457,10 +470,7 @@ data class PdfState(
                 awaitCancellation()
             } finally {
                 isInitialized.value = false
-                if (this@PdfState::renderer.isInitialized) {
-                    renderer.close()
-                    pdfSource.dispose()
-                }
+                renderer.close()
             }
         }
     }

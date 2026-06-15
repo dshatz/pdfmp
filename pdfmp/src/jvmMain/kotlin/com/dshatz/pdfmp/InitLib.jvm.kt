@@ -6,6 +6,7 @@ import java.util.Locale
 import kotlin.io.path.createTempDirectory
 import kotlin.use
 
+/*
 actual class InitLib {
     private val osName = System.getProperty("os.name").lowercase(Locale.ENGLISH)
     private val osArch = System.getProperty("os.arch").lowercase(Locale.ENGLISH)
@@ -69,4 +70,4 @@ actual class InitLib {
 
         throw UnsupportedOperationException("Unsupported OS/Arch: $osName / $osArch")
     }
-}
+}*/
