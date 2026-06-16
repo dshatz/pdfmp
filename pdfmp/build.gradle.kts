@@ -65,6 +65,7 @@ fun KotlinNativeTarget.setUpPdfiumCinterop() {
 private fun KotlinNativeTarget.setupSharedLib() {
     val androidLib = androidArchMap[name]
     val pdfiumPath = androidLib ?: name
+    val targetName = name
 
     binaries {
         sharedLib {
@@ -81,7 +82,11 @@ private fun KotlinNativeTarget.setupSharedLib() {
         val binariesModuleDir = project(":pdfium-binaries").projectDir
         linkerOpts.add("-L$binariesModuleDir/binaries/$pdfiumPath")
         linkerOpts.add("-lpdfium")
-        if (name.contains("linux")) linkerOpts.add("-lcrypt")
+
+        // Without this we'd link against libcrypt.so.1 unnecessarily and that's
+        // not even available in a flatpak.
+        // See https://youtrack.jetbrains.com/projects/KT/issues/KT-55643
+        if (targetName.contains("linux")) linkerOpts.add("-Wl,--as-needed")
     }
 
     binaries {
