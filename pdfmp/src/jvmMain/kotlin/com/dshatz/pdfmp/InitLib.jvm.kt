@@ -9,10 +9,11 @@ import kotlin.use
 actual class InitLib {
     private val osName = System.getProperty("os.name").lowercase(Locale.ENGLISH)
     private val osArch = System.getProperty("os.arch").lowercase(Locale.ENGLISH)
+    
     actual fun init() {
         try {
-            loadLibraryFromJar("pdfium")
-            loadLibraryFromJar("pdfmp")
+            overrideLoadLibrary?.invoke("pdfium") ?: loadLibraryFromJar("pdfium")
+            overrideLoadLibrary?.invoke("pdfmp") ?: loadLibraryFromJar("pdfmp")
             PDFBridge.initNative()
         } catch (e: UnsatisfiedLinkError) {
             e("Failed to load native library", e)
@@ -68,5 +69,9 @@ actual class InitLib {
         }
 
         throw UnsupportedOperationException("Unsupported OS/Arch: $osName / $osArch")
+    }
+    
+    companion object {
+        var overrideLoadLibrary: ((name: String) -> Unit)? = null
     }
 }
