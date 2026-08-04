@@ -3,7 +3,11 @@ package com.dshatz.pdfmp.compose.tools
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
+import com.dshatz.pdfmp.ConsumerBuffer
 import com.dshatz.pdfmp.compose.CurrentImage
+
+
+internal expect fun ConsumerBuffer.toImageBitmap(): ImageBitmap
 
 @Composable
 internal expect fun CurrentImage.toImageBitmap(): RecyclableBitmap

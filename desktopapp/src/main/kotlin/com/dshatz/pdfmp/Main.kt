@@ -8,7 +8,7 @@ import androidx.compose.ui.window.rememberWindowState
 
 fun main() {
     application {
-        val state = rememberWindowState(size = DpSize(1080.dp, 1080.dp))
+        val state = rememberWindowState(size = DpSize(1000.dp, 1060.dp))
         Window(onCloseRequest = ::exitApplication, state = state, title = "PDFMP Sample", icon = iconPainter()) {
 //            DemoTabs(PdfSource.PdfPath(Path("/home/dshatz/Downloads/sample2.pdf")))
             Sample()

@@ -2,13 +2,16 @@ package com.dshatz.pdfmp
 
 import com.dshatz.kni.buffers.ByteBuffer
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
-import io.ktor.client.*
-import io.ktor.client.plugins.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.expectSuccess
+import io.ktor.client.request.get
+import io.ktor.client.request.head
+import io.ktor.client.request.header
+import io.ktor.client.statement.readBytes
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentLength
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
 import kotlinx.coroutines.runBlocking
 
 class NetworkPdfSourceAdapter(
@@ -20,6 +23,7 @@ class NetworkPdfSourceAdapter(
     private val chunkCache = mutableMapOf<Int, ByteArray>()
 
     private val length: Long by lazy {
+
         runBlocking(Dispatchers.IO) {
             val response = client.head(url) {
                 expectSuccess = true
@@ -56,14 +60,6 @@ class NetworkPdfSourceAdapter(
         }
         buffer.write(result)
         bytesCopied
-    }
-
-    override fun setError(error: String?) {
-        w("Error from c: $error")
-    }
-
-    override fun getLastError(): String? {
-        return null
     }
 
 

@@ -16,9 +16,4 @@ interface CustomPdfSourceAdapter: AutoCloseable {
      * @return how many bytes were written.
      */
     fun readBlock(position: Long, buffer: ByteBuffer): Int
-
-    fun setError(error: String?)
-    fun getLastError(): String?
-
-    override fun close()
 }

@@ -1,6 +1,6 @@
 package com.dshatz.pdfmp.compose
 
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,27 +11,34 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.toSize
+import com.dshatz.pdfmp.ConsumerBuffer
+import com.dshatz.pdfmp.PdfTile
 import com.dshatz.pdfmp.compose.platformModifier.platformScrollableModifier
 import com.dshatz.pdfmp.compose.state.PdfState
 import com.dshatz.pdfmp.compose.tools.TransformedBitmapRenderer
 import com.dshatz.pdfmp.compose.tools.pageTransformModifier
-import com.dshatz.pdfmp.model.calculateSize
-import kotlinx.coroutines.delay
+import com.dshatz.pdfmp.compose.tools.toImageBitmap
+import kotlinx.coroutines.launch
 
 /**
  * Display a PDF document from the given [state].
@@ -68,10 +75,7 @@ fun PdfView(
                 state,
                 modifier = Modifier.matchParentSize()
             )
-            PdfViewport(
-                state,
-                modifier = Modifier.matchParentSize()
-            )
+            TiledViewport(state, Modifier.matchParentSize())
         }
     }
 }
@@ -94,54 +98,54 @@ private fun LazyListScope.fullDocumentBoxes(state: PdfState) {
 }
 
 @Composable
-private fun PdfViewport(
+private fun TiledViewport(
     state: PdfState,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
-    val transforms by state.produceImageTransforms()
-    val image by produceState<CurrentImage?>(null, transforms) {
-        delay(100)
-        state.renderViewport(transforms)?.let {
-            val (response, buffer) = it
-            value = CurrentImage(
-                transforms,
-                response.transforms,
-                buffer
-            )
-        }
-    }
+    val tiles by state.visibleTiles
 
+    val renderedMap = remember { mutableStateMapOf<PdfTile, ConsumerBuffer>() }
 
-
-    val sliceSize = image?.loadedTransforms?.calculateSize()?.let {
-        with(LocalDensity.current) {
-            IntSize(it.first, it.second).toSize().toDpSize()
-        }
-    }
-    Box(modifier, contentAlignment = Alignment.TopStart) {
-        if (transforms == image?.loadedTransforms) {
-            image?.let { img ->
-                sliceSize?.let {
-                    val bitmap = img.composeBitmap()
-                    val (w, h) = img.loadedTransforms.calculateSize()
-                    val painter = remember(img) {
-                        androidx.compose.ui.graphics.painter.BitmapPainter(
-                            image = bitmap.imageBitmap,
-                            srcSize = IntSize(
-                                w, h
-                            )
-                        )
+    val scope = rememberCoroutineScope()
+    for (tile in tiles) {
+        key(tile) {
+            DisposableEffect(tile) {
+                val job = scope.launch {
+                    val buffer = state.renderTile(tile)
+                    renderedMap[tile] = buffer
+                }
+                onDispose {
+                    job.cancel()
+                    renderedMap.remove(tile)?.let { buffer ->
+                        state.freeTile(tile)
                     }
-                    img.composeBitmap().touch()
-                    Image(
-                        contentScale = ContentScale.FillBounds,
-                        painter = painter,
-                        contentDescription = null,
-                        colorFilter = img.composeBitmap().colorFilter,
-                        modifier = Modifier.requiredSize(sliceSize)
-                    )
                 }
             }
+        }
+    }
+    val display by state.layoutInfo()
+    display?.let { currentDisplay ->
+        Box(modifier) {
+            Canvas(Modifier.matchParentSize().clipToBounds()) {
+                tiles.forEach { tile ->
+                    renderedMap[tile]?.let { buffer ->
+                        val pageOffset = currentDisplay.pageOffsetY(tile.key.page).value
+                        val offset = Offset(
+                            x = -currentDisplay.offsetX,
+                            y = pageOffset - currentDisplay.offsetY
+                        )
+                        drawImage(
+                            image = buffer.toImageBitmap(),
+                            topLeft = Offset(tile.key.x.toFloat(), tile.key.y.toFloat()) + offset
+                        )
+                    }
+                }
+            }
+            Text(
+                "Tiles: ${renderedMap.size}",
+                modifier = Modifier.align(Alignment.TopEnd),
+                style = MaterialTheme.typography.headlineMedium
+            )
         }
     }
 }
@@ -229,10 +233,6 @@ private fun BaseImage(
                         modifier = Modifier.matchParentSize()
                     )
                 }
-                /*Text(
-                    "Size: $boxSize; TopGap: ${transform.topGap}",
-                    modifier = Modifier.align(Alignment.TopEnd).background(Color.LightGray)
-                )*/
             }
         }
     }

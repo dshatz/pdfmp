@@ -1,6 +1,6 @@
 package com.dshatz.pdfmp
 
-expect class InitLib: LibInitializer {
+expect object InitLib: LibInitializer {
     override fun loadLibs()
 }
 

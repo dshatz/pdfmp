@@ -166,24 +166,6 @@ fun KotlinNativeTarget.androidLinkerOpts() {
 
 kotlin {
     applyDefaultHierarchyTemplate()
-    /*applyDefaultHierarchyTemplate {
-        common {
-            group("native") {
-                *//* more groups created in sourceSets block below *//*
-                group("nativeJni") {
-                    group("desktopNativeJni") {
-                        withLinux()
-                        withMingw()
-                        withMacos()
-                    }
-                    withAndroidNative()
-                }
-                group("nativeNonJni") {
-                    withIos()
-                }
-            }
-        }
-    }*/
     jvmToolchain(21)
     androidLibrary {
         namespace = "com.dshatz.pdfmp"
@@ -264,7 +246,7 @@ kotlin {
         }
         val jniCommonMain by getting {
             dependencies {
-                implementation(libs.jni)
+                api(libs.jni)
             }
         }
         /*configureOptional("androidNativeMain") {

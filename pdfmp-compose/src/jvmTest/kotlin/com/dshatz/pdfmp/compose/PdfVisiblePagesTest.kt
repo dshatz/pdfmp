@@ -1,20 +1,11 @@
 package com.dshatz.pdfmp.compose
 
-import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import com.dshatz.pdfmp.compose.state.PdfState
 import com.dshatz.pdfmp.compose.state.VisiblePageInfo
-import com.dshatz.pdfmp.source.PdfSource
 import de.infix.testBalloon.framework.core.testSuite
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
-import io.mockk.every
-import io.mockk.mockk
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.io.files.Path
 
 val pdfVisiblePagesTests by testSuite {
     test("simple") {
@@ -162,22 +153,3 @@ val pdfVisiblePagesTests by testSuite {
     }
 }
 
-private fun getMockedState(
-    pageRatio: Float = 1f,
-    pageCount: Int = 10,
-    gap: Int = 0,
-    viewportSize: Size = Size(1000f, 1500f),
-): PdfState {
-    val scope = CoroutineScope(Dispatchers.Default)
-    val renderer = mockk<PdfRenderer>()
-    val state = PdfState(PdfSource.PdfPath(Path("")), pageSpacing = gap, scope = scope)
-    every { renderer.getPageRatio(any()) } returns Result.success(pageRatio )
-    every { renderer.getPageCount() } returns Result.success(pageCount)
-    state.initPages(renderer)
-    state.bind(LazyListState(0, 0), ScrollState(0))
-
-    state.isInitialized.value = true
-
-    state.setViewport(viewportSize)
-    return state
-}

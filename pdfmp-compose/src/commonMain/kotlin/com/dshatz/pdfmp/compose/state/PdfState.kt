@@ -11,20 +11,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.dshatz.pdfmp.*
+import com.dshatz.pdfmp.model.BufferInfo
 import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.model.RenderResponse
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.coroutines.*
+import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.time.ExperimentalTime
-import kotlin.time.measureTime
 
 
 @Composable
 fun InitLibEffect() {
-    InitLib().init()
+    InitLib.init()
 }
 
 @Composable
@@ -36,13 +37,13 @@ fun rememberPdfState(
     InitLibEffect()
     val scope = rememberCoroutineScope()
     val pageSpacingPx = with(LocalDensity.current) { pageSpacing.toPx().toInt() }
-    val renderer by remember(pdfSource) {
-        derivedStateOf {
+    val state = remember { PdfState(pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
+    LaunchedEffect(pdfSource) {
+        val renderer = withContext(Dispatchers.Default) {
             PdfRenderer(pdfSource)
         }
+        state.openDocument(renderer)
     }
-    val state = remember { PdfState(renderer, pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
-    state.OpenDisposableDocument()
     return state
 }
 
@@ -54,22 +55,24 @@ fun rememberPdfState(
 ): PdfState {
     InitLibEffect()
     val scope = rememberCoroutineScope()
-    val renderer by remember(customPdfSourceAdapter) {
-        derivedStateOf {
-            PdfRenderer(customPdfSourceAdapter)
-        }
-    }
     val pageSpacingPx = with(LocalDensity.current) { pageSpacing.toPx().toInt() }
-    val state = remember { PdfState(renderer, pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
-    state.OpenDisposableDocument()
+    val state = remember { PdfState(pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
+    LaunchedEffect(customPdfSourceAdapter) {
+        val renderer = withContext(Dispatchers.Default) {
+            d("Init with custom source (jvm)")
+            PdfRenderer(customPdfSourceAdapter).also {
+                d("After init with custom source (jvm)")
+            }
+        }
+        state.openDocument(renderer)
+    }
     return state
 }
 
 @OptIn(ExperimentalTime::class)
 data class PdfState(
-    private val renderer: PdfRenderer,
     internal val pageRange: IntRange = 0..Int.MAX_VALUE,
-    private val scale: MutableState<Float> = mutableFloatStateOf(1f),
+    internal val scale: MutableState<Float> = mutableFloatStateOf(1f),
     internal val viewport: MutableState<Size> = mutableStateOf(Size(1f, 1f)),
     val pageSpacing: Int = 0,
     private val scope: CoroutineScope
@@ -143,6 +146,7 @@ data class PdfState(
     private val scrollState = PdfLayoutInfo(
         setOffsetY = { renderingY.value = it },
         getOffsetY = renderingY::value,
+        getOffsetX = renderingX::value,
         getPageOffsetY = ::pageScrollOffset,
         getTotalHeight = { totalDocumentHeight.value - viewport.value.height },
         getVisiblePages = { visiblePages.value },
@@ -182,11 +186,11 @@ data class PdfState(
         calculateVisiblePages()
     }
 
-    private fun scaledPageWidth(viewport: MutableState<Size>, scale: State<Float>): Float {
+    internal fun scaledPageWidth(viewport: MutableState<Size>, scale: State<Float>): Float {
         return viewport.value.width * scale.value
     }
 
-    private fun scaledPageHeight(pageIdx: Int, scaledWidth: Float = scaledPageWidth(viewport, scale)): Float {
+    internal fun scaledPageHeight(pageIdx: Int, scaledWidth: Float = scaledPageWidth(viewport, scale)): Float {
         // If aspect ratio is not known yet, fallback to one of the other pages or A4.
         val aspectRatio = pageRatios[pageIdx] ?: pageRatios.firstNotNullOfOrNull { it.value } ?: 1f
         return scaledWidth / (aspectRatio)
@@ -296,6 +300,71 @@ data class PdfState(
         }
     }
 
+    private fun calculateVisibleTiles(): List<PdfTile> {
+        val currentY = renderingY.floatValue
+        val currentX = renderingX.floatValue
+        val viewportHeight = viewport.value.height
+        val viewportWidth = viewport.value.width
+        val currentScale = scale.value
+        val currentScaledWidth = viewportWidth * currentScale
+
+        val viewportBottom = currentY + viewportHeight
+        val viewportRight = currentX + viewportWidth
+
+        val verticalSpacing = scaledPageSpacing()
+        val visibleTiles = mutableListOf<PdfTile>()
+        var accumulatedHeight = 0f
+
+        for ((i, _) in pages) {
+            val pageHeight = scaledPageHeight(i, currentScaledWidth)
+            val pageTop = accumulatedHeight
+            val pageBottom = pageTop + pageHeight
+            if (pageBottom > currentY && pageTop < viewportBottom) {
+
+                val topLeft = Offset(
+                    x = currentX.coerceAtLeast(0f),
+                    y = (currentY - pageTop).coerceAtLeast(0f),
+                )
+                val bottomRight = Offset(
+                    x = viewportRight.coerceAtMost(currentScaledWidth),
+                    y = (viewportBottom - pageTop).coerceAtMost(pageHeight)
+                )
+
+                val minRow = (topLeft.y / PdfTile.HEIGHT).toInt()
+                val maxRow = (bottomRight.y / PdfTile.HEIGHT).ceilToInt()
+                val minCol = (topLeft.x / PdfTile.WIDTH).toInt()
+                val maxCol = (bottomRight.x / PdfTile.WIDTH).ceilToInt()
+
+                val scaledDimensions = PageDimensions(
+                    currentScaledWidth.toInt(),
+                    pageHeight.toInt()
+                )
+
+                for (row in minRow..<maxRow) {
+                    for(col in minCol..<maxCol) {
+                        val tile = PdfTile(
+                            key = TileKey(
+                                i,
+                                col * PdfTile.WIDTH,
+                                row * PdfTile.HEIGHT
+                            ),
+                            scaledPage = scaledDimensions
+                        )
+                        visibleTiles += tile
+                    }
+                }
+            }
+
+            accumulatedHeight += pageHeight + verticalSpacing
+            if (accumulatedHeight > currentY + viewportHeight) break
+        }
+        return visibleTiles
+    }
+
+    private fun Float.ceilToInt(): Int {
+        return ceil(this).toInt()
+    }
+
     private fun calculateVisiblePages(): List<VisiblePageInfo> {
         val currentY = renderingY.floatValue
         val currentX = renderingX.floatValue
@@ -362,44 +431,31 @@ data class PdfState(
         return (pageSpacing * scale.value).toInt()
     }
 
-    internal suspend fun renderViewport(transforms: List<PageTransform>): Pair<RenderResponse, ConsumerBuffer>? {
-        // We can just grab the offset of the first visible page.
-        // Subsequent pages are automatically spaced by the native renderer.
-        val topOffset = visiblePages.value.firstOrNull()?.topGap ?: 0
-
-        // Otherwise native will receive 0x0 size and crash.
-        if (transforms.isEmpty()) return null
-
-        val buffer = bufferPool.getBufferViewport(transforms)
-        return buffer.withAddress {
-                val response = renderer.renderSuspend(
-                    RenderRequest(
-                        transforms,
-                        pageSpacing,
-                        topOffset,
-                        buffer.dimensions.withAddress(it),
-                    )
-                )
-                response.map { resp ->
-                    error.value = null
-                    resp to buffer
-                }.getOrElse {
-                    error.value = it
-                    null
-                }
+    internal suspend fun renderTile(tile: PdfTile): ConsumerBuffer = withContext(pdfiumDispatcher) {
+        val (buffer, needsRender) = bufferPool.getBufferTile(tile)
+        if (needsRender) {
+            buffer.withAddress {
+                renderer!!.renderTileSuspend(tile, BufferInfo(buffer.dimensions, it))
             }
-
+        }
+        return@withContext buffer
     }
 
-    internal suspend fun renderFullPage(transform: PageTransform): Pair<RenderResponse, ConsumerBuffer>? {
+    internal fun freeTile(tile: PdfTile) {
+        bufferPool.freeTileBuffer(tile)
+    }
+
+    private val pdfiumDispatcher = Dispatchers.Default.limitedParallelism(1)
+
+    internal suspend fun renderFullPage(transform: PageTransform): Pair<RenderResponse, ConsumerBuffer>? = withContext(pdfiumDispatcher) {
         val buffer = bufferPool.getBufferPage(transform)
 
-        pageRatios[transform.pageIndex] = renderer.getPageRatio(transform.pageIndex).getOrElse {
+        pageRatios[transform.pageIndex] = renderer!!.getPageRatioSuspend(transform.pageIndex).getOrElse {
             this@PdfState.error.value = it
-            return null
+            return@withContext null
         }
-        return buffer.withAddress {
-            val response = renderer.render(
+        return@withContext buffer.withAddress {
+            val response = renderer!!.renderSuspend(
                 RenderRequest(
                     listOf(transform),
                     0,
@@ -436,8 +492,14 @@ data class PdfState(
         }
     }
 
-    internal fun initPages(renderer: PdfRenderer): Result<Unit> {
-        return renderer.getPageCount().mapCatching { count ->
+    internal val visibleTiles = derivedStateOf {
+        if (isInitialized.value) {
+            calculateVisibleTiles()
+        } else emptyList()
+    }
+
+    internal suspend fun initPages(renderer: PdfRenderer): Result<Unit> {
+        return renderer.getPageCountSuspend().mapCatching { count ->
             val range = (0..<count)
             val truncated = range.withIndex()
                 .drop(pageRange.first).take(min(pageRange.last - pageRange.first, count - pageRange.first) + 1)
@@ -451,25 +513,29 @@ data class PdfState(
         }
     }
 
-    @Composable
-    internal fun OpenDisposableDocument() {
-        LaunchedEffect(renderer) {
-            try {
-                withContext(Dispatchers.Default) {
-                    renderer.openDocument().mapCatching {
-                        bufferPool = ConsumerBufferPool()
-                    }.onFailure {
-                        d("Failed to open document: $it")
-                        this@PdfState.error.value = it
-                    }.onSuccess {
-                        error.value = null
-                        initPages(renderer).getOrThrow()
-                        isInitialized.value = true
-                    }
+    private var renderer: PdfRenderer? = null
+    internal suspend fun openDocument(renderer: PdfRenderer) {
+        this.renderer = renderer
+        try {
+            withContext(pdfiumDispatcher) {
+                d("openDocument jvm")
+                renderer.openDocument().mapCatching {
+                    d("after openDocument jvm")
+                    bufferPool = ConsumerBufferPool()
+                }.onFailure {
+                    d("Failed to open document: $it")
+                    this@PdfState.error.value = it
+                }.onSuccess {
+                    error.value = null
+                    initPages(renderer).getOrThrow()
+                    isInitialized.value = true
                 }
                 awaitCancellation()
-            } finally {
-                isInitialized.value = false
+            }
+        } finally {
+            d("Closing renderer")
+            isInitialized.value = false
+            withContext(NonCancellable + pdfiumDispatcher) {
                 renderer.close()
             }
         }
