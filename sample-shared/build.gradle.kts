@@ -11,7 +11,6 @@ plugins {
     alias(libs.plugins.kni)
     alias(libs.plugins.compose.kt)
     alias(libs.plugins.android.lib)
-    alias(libs.plugins.atomicfu)
 }
 
 kotlin {
@@ -25,6 +24,7 @@ kotlin {
         namespace = "com.dshatz.pdfmp.sampleshared"
         compileSdk = 36
         minSdk = 24
+        androidResources.enable = true
     }
 
     optionalTargets {

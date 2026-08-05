@@ -1,43 +1,23 @@
 package com.dshatz.pdfmp.compose.tools
 
-import android.annotation.SuppressLint
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.ColorMatrixColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import com.dshatz.pdfmp.compose.CurrentImage
-import com.dshatz.pdfmp.model.calculateSize
+import androidx.compose.ui.graphics.colorspace.ColorSpace
+import com.dshatz.pdfmp.ConsumerBuffer
 
+internal actual fun ConsumerBuffer.toImageBitmap(): ImageBitmap {
+    return androidBitmap.asImageBitmap()
+}
 
-private val BgrToRgbMatrix = ColorMatrix(
-    floatArrayOf(
-        0f, 0f, 1f, 0f, 0f,
-        0f, 1f, 0f, 0f, 0f,
-        1f, 0f, 0f, 0f, 0f,
-        0f, 0f, 0f, 1f, 0f
+internal actual val bufferColorFilter: ColorFilter = ColorFilter.colorMatrix(
+    ColorMatrix(
+        floatArrayOf(
+            0f, 0f, 1f, 0f, 0f,  // Red comes from Blue channel
+            0f, 1f, 0f, 0f, 0f,  // Green stays Green
+            1f, 0f, 0f, 0f, 0f,  // Blue comes from Red channel
+            0f, 0f, 0f, 1f, 0f   // Alpha remains unchanged
+        )
     )
 )
-
-@SuppressLint("UseKtx")
-@Composable
-internal actual fun CurrentImage.toImageBitmap(): RecyclableBitmap {
-    val imageBitmap = remember(this.loadedTransforms, buffer) {
-        val (width, height) = loadedTransforms.calculateSize()
-        val bitmap = buffer.androidBitmap
-
-        if (width == 0 || height == 0) {
-            RecyclableBitmap(ImageBitmap(1, 1))
-        } else {
-            RecyclableBitmap(
-                bitmap.asImageBitmap(),
-                onTouch = {
-                    bitmap.setPixel(0,0, bitmap.getPixel(0,0))
-                },
-                colorFilter = ColorMatrixColorFilter(BgrToRgbMatrix)
-            )
-        }
-    }
-    return imageBitmap
-}

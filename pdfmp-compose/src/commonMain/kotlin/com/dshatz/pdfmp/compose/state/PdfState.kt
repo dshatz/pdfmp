@@ -2,7 +2,17 @@ package com.dshatz.pdfmp.compose.state
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -10,14 +20,28 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import com.dshatz.pdfmp.*
+import com.dshatz.pdfmp.ConsumerBuffer
+import com.dshatz.pdfmp.ConsumerBufferPool
+import com.dshatz.pdfmp.InitLib
+import com.dshatz.pdfmp.PageDimensions
+import com.dshatz.pdfmp.PdfRenderer
+import com.dshatz.pdfmp.PdfTile
+import com.dshatz.pdfmp.TileKey
+import com.dshatz.pdfmp.d
+import com.dshatz.pdfmp.getPageCountSuspend
+import com.dshatz.pdfmp.getPageRatioSuspend
 import com.dshatz.pdfmp.model.BufferInfo
-import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.RenderRequest
-import com.dshatz.pdfmp.model.RenderResponse
+import com.dshatz.pdfmp.renderSuspend
+import com.dshatz.pdfmp.renderTileSuspend
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.time.ExperimentalTime
@@ -445,35 +469,33 @@ data class PdfState(
         bufferPool.freeTileBuffer(tile)
     }
 
-    private val pdfiumDispatcher = Dispatchers.Default.limitedParallelism(1)
-
-    internal suspend fun renderFullPage(transform: PageTransform): Pair<RenderResponse, ConsumerBuffer>? = withContext(pdfiumDispatcher) {
-        val buffer = bufferPool.getBufferPage(transform)
-
-        pageRatios[transform.pageIndex] = renderer!!.getPageRatioSuspend(transform.pageIndex).getOrElse {
-            this@PdfState.error.value = it
-            return@withContext null
-        }
-        return@withContext buffer.withAddress {
-            val response = renderer!!.renderSuspend(
-                RenderRequest(
-                    listOf(transform),
-                    0,
-                    0,
-                    buffer.dimensions.withAddress(it)
-                )
-            )
-            response.map { resp ->
-                error.value = null
-                resp to buffer
-            }.getOrElse {
-                error.value = it
-                null
-            }
-        }
+    internal fun freePage(page: Int) {
+        bufferPool.freePageBuffer(page)
     }
 
-    @Composable
+    private val pdfiumDispatcher = Dispatchers.Default.limitedParallelism(1)
+
+    internal suspend fun renderFullPage(page: Int): ConsumerBuffer = withContext(pdfiumDispatcher) {
+        pageRatios[page] = renderer!!.getPageRatioSuspend(page).getOrThrow()
+
+        val pageWidth = scaledPageWidth(viewport, scale)
+        val pageHeight = scaledPageHeight(page, pageWidth)
+        val pageDimensions = PageDimensions(pageWidth.toInt(), pageHeight.toInt())
+        val buffer = bufferPool.getBufferPage(page, pageDimensions)
+
+        buffer.withAddress {
+            renderer!!.renderSuspend(
+                RenderRequest(
+                    page,
+                    pageDimensions,
+                    BufferInfo(buffer.dimensions, it)
+                )
+            )
+        }
+        buffer
+    }
+
+    /*@Composable
     internal fun produceImageTransforms(): State<List<PageTransform>> {
         return derivedStateOf {
             visiblePages.value.map {
@@ -490,7 +512,7 @@ data class PdfState(
                 )
             }
         }
-    }
+    }*/
 
     internal val visibleTiles = derivedStateOf {
         if (isInitialized.value) {

@@ -3,12 +3,10 @@ package com.dshatz.pdfmp
 import com.dshatz.kni.annotations.JniCall
 import com.dshatz.pdfmp.model.BufferInfo
 import com.dshatz.pdfmp.model.RenderRequest
-import com.dshatz.pdfmp.model.RenderResponse
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
-import kotlin.time.measureTime
 import kotlin.time.measureTimedValue
 
 expect class PdfRenderer: AutoCloseable {
@@ -33,10 +31,10 @@ expect class PdfRenderer: AutoCloseable {
     override fun close()
 }
 
-suspend fun PdfRenderer.renderSuspend(renderRequest: RenderRequest): Result<RenderResponse> = suspendCancellableCoroutine { cont ->
+suspend fun PdfRenderer.renderSuspend(renderRequest: RenderRequest): Result<Unit> = suspendCancellableCoroutine { cont ->
         renderAsync(renderRequest, object: RenderCallback {
-            override fun onSuccess(result: RenderResponse) {
-                cont.resume(Result.success(result))
+            override fun onSuccess() {
+                cont.resume(Result.success(Unit))
             }
 
             override fun onFailure(message: String) {

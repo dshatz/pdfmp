@@ -1,17 +1,13 @@
 package com.dshatz.pdfmp.model
 
 import com.dshatz.kni.annotations.JniSerializable
-import com.dshatz.pdfmp.model.BufferInfo.Companion.pack
-import com.dshatz.pdfmp.packList
-import com.dshatz.pdfmp.unpackList
+import com.dshatz.pdfmp.PageDimensions
 import kotlinx.io.Buffer
-import kotlinx.io.readByteArray
 
 @JniSerializable
 data class RenderRequest(
-    val transforms: List<PageTransform>,
-    val pageSpacing: Int,
-    val topOffset: Int,
+    val page: Int,
+    val dimensions: PageDimensions,
     val bufferInfo: BufferInfo,
 )
 

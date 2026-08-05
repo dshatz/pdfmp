@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -19,7 +18,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -30,15 +28,17 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.toSize
 import com.dshatz.pdfmp.ConsumerBuffer
 import com.dshatz.pdfmp.PdfTile
 import com.dshatz.pdfmp.compose.platformModifier.platformScrollableModifier
 import com.dshatz.pdfmp.compose.state.PdfState
-import com.dshatz.pdfmp.compose.tools.TransformedBitmapRenderer
+import com.dshatz.pdfmp.compose.tools.bufferColorFilter
 import com.dshatz.pdfmp.compose.tools.pageTransformModifier
 import com.dshatz.pdfmp.compose.tools.toImageBitmap
 import kotlinx.coroutines.launch
+import kotlin.collections.set
 
 /**
  * Display a PDF document from the given [state].
@@ -71,7 +71,7 @@ fun PdfView(
             ) {
                 fullDocumentBoxes(state)
             }
-            BaseImage(
+            FullPages(
                 state,
                 modifier = Modifier.matchParentSize()
             )
@@ -136,101 +136,65 @@ private fun TiledViewport(
                         )
                         drawImage(
                             image = buffer.toImageBitmap(),
-                            topLeft = Offset(tile.key.x.toFloat(), tile.key.y.toFloat()) + offset
+                            topLeft = Offset(tile.key.x.toFloat(), tile.key.y.toFloat()) + offset,
+                            colorFilter = bufferColorFilter
                         )
                     }
                 }
             }
-            Text(
+            /*Text(
                 "Tiles: ${renderedMap.size}",
                 modifier = Modifier.align(Alignment.TopEnd),
                 style = MaterialTheme.typography.headlineMedium
-            )
+            )*/
         }
     }
 }
 
+
 @Composable
-private fun BaseImage(
+private fun FullPages(
     state: PdfState,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier
 ) {
-    val transforms by state.produceImageTransforms()
-    val uncutTransforms = transforms.map { it.uncut().copy(topGap = 0) }
+    val renderedMap = remember { mutableStateMapOf<Int, ConsumerBuffer>() }
+    val visiblePages by state.visiblePages
+    val scope = rememberCoroutineScope()
+    for (page in visiblePages) {
+        key(page.pageIdx) {
+            DisposableEffect(page.pageIdx) {
+                val job = scope.launch {
+                    val buffer = state.renderFullPage(page.pageIdx)
+                    renderedMap[page.pageIdx] = buffer
+                }
+                onDispose {
+                    job.cancel()
 
-    val baseImageCache = remember { mutableStateMapOf<Int, CurrentImage>() }
-    val viewPortCache = remember { mutableStateOf<Size?>(null) }
-
-    LaunchedEffect(uncutTransforms, state.viewport.value) {
-        val currentViewport = state.viewport.value
-        val viewportChanged = viewPortCache.value != currentViewport
-
-        transforms.forEach { transform ->
-            // Check if not already cached.
-            if (!baseImageCache.containsKey(transform.pageIndex) || viewportChanged) {
-                // Use the uncut version at scale 1x
-                val width1x = (transform.scaledWidth / transform.scale).toInt()
-                val height1x = (transform.scaledHeight / transform.scale).toInt()
-
-                if (width1x > 0 && height1x > 0) {
-                    val fullPageTransform = transform.uncut().copy(
-                        scale = 1f,
-                        scaledWidth = width1x,
-                        scaledHeight = height1x,
-                        topGap = 0
-                    )
-
-                    state.renderFullPage(fullPageTransform)?.let {
-                        val (response, buffer) = it
-                        val image = CurrentImage(
-                            requestedTransforms = listOf(fullPageTransform),
-                            loadedTransforms = response.transforms,
-                            buffer = buffer
-                        )
-                        baseImageCache[transform.pageIndex] = image
+                    renderedMap.remove(page.pageIdx)?.let { buffer ->
+                        state.freePage(page.pageIdx)
                     }
                 }
             }
         }
-
-        if (viewportChanged) {
-            viewPortCache.value = currentViewport
-        }
-
-        // remove pages that are no longer visible from cache
-        val toRemove = baseImageCache.filter {
-            it.key !in transforms.map { t -> t.pageIndex }
-        }
-        baseImageCache.keys.removeAll(toRemove.keys)
-        toRemove.forEach { it.value.free() }
     }
-    Column(modifier = modifier) {
-        transforms.forEach { transform ->
-            val cachedImage = baseImageCache[transform.pageIndex]
+    val display by state.layoutInfo()
+    display?.let { currentDisplay ->
+        Canvas(modifier.clipToBounds()) {
+            visiblePages.forEach { page ->
+                renderedMap[page.pageIdx]?.let { buffer ->
+                    val pageOffset = currentDisplay.pageOffsetY(page.pageIdx).value
 
-            val (sliceWidth, sliceHeight) = transform.sliceSize()
-            val dstSize = IntSize(sliceWidth, sliceHeight)
-
-            val density = LocalDensity.current
-            val boxSize = with(density) {
-                dstSize.toSize().toDpSize()
-            }
-
-            Box(
-                modifier = Modifier
-                    // Order matters - first padding then size!
-                    // We need total occupied height to be height + padding.
-                    .padding(top = with(density) { transform.topGap.toDp() })
-                    .size(boxSize)
-            ) {
-                if (cachedImage != null) {
-                    val bitmap = cachedImage.composeBitmap()
-                    bitmap.touch()
-                    TransformedBitmapRenderer(
-                        bitmap = bitmap.imageBitmap,
-                        colorFilter = bitmap.colorFilter,
-                        transform = transform,
-                        modifier = Modifier.matchParentSize()
+                    val offset = Offset(
+                        x = -currentDisplay.offsetX,
+                        y = pageOffset - currentDisplay.offsetY
+                    )
+                    val scaledWidth = state.scaledPageWidth(state.viewport, state.scale)
+                    val scaledHeigh = state.scaledPageHeight(page.pageIdx, scaledWidth)
+                    drawImage(
+                        image = buffer.toImageBitmap(),
+                        dstSize = IntSize(scaledWidth.toInt(), scaledHeigh.toInt()),
+                        dstOffset = offset.round(),
+                        colorFilter = bufferColorFilter
                     )
                 }
             }

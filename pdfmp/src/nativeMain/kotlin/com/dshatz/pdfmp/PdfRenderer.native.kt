@@ -26,9 +26,7 @@ import com.dshatz.pdfmp.error.FileError
 import com.dshatz.pdfmp.error.PdfiumException
 import com.dshatz.pdfmp.model.BufferDimensions
 import com.dshatz.pdfmp.model.BufferInfo
-import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.RenderRequest
-import com.dshatz.pdfmp.model.RenderResponse
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.atomicfu.locks.ReentrantLock
@@ -230,22 +228,35 @@ actual class PdfRenderer: AutoCloseable {
 
     @JniCall
     actual fun renderAsync(renderRequest: RenderRequest, callback: RenderCallback) {
-        val renderResponse = runCatching {
-            renderPages(
-                renderRequest.transforms,
-                renderRequest.bufferInfo.address,
-                renderRequest.bufferInfo.dimensions
+        val dimensions = renderRequest.dimensions
+        val bitmap = renderRequest.bufferInfo.dimensions.fpdfBitmap(renderRequest.bufferInfo.address)
+
+        val page = doc.handle.openPage(renderRequest.page)
+        val result = runCatching {
+            FPDFBitmap_FillRect(
+                bitmap,
+                0,
+                0,
+                dimensions.width,
+                dimensions.height,
+                0xFFFFFFFFu
             )
-        }.recoverCatching {
-            val customSourceError = getLastErrorForCustomSource()
-            if (customSourceError != null) {
-                error(customSourceError)
-            } else throw it
+            FPDF_RenderPageBitmap(
+                bitmap,
+                page,
+                0,
+                0,
+                dimensions.width,
+                dimensions.height,
+                0,
+                0
+            )
         }
-        renderResponse.onSuccess {
-            callback.onSuccess(it)
-        }.onFailure { callback.onFailure(it.message ?: "Unknown render error") }
+        page.closePage()
+        result.onFailure { callback.onFailure(it.message ?: "Unknown error") }
+            .onSuccess { callback.onSuccess() }
         callback.close()
+        FPDFBitmap_Destroy(bitmap)
     }
 
     private fun getLastErrorForCustomSource(): String? {
@@ -272,96 +283,6 @@ actual class PdfRenderer: AutoCloseable {
 
     private fun FPDF_PAGE.closePage() {
         FPDF_ClosePage(this)
-    }
-
-    @OptIn(ExperimentalForeignApi::class, UnsafeNumber::class)
-    private fun renderPages(
-        transforms: List<PageTransform>,
-        bufferAddress: Long,
-        bufferDimensions: BufferDimensions
-    ): RenderResponse {
-        val document = doc.handle
-
-        var totalHeight = 0
-        var maxWidth = 0
-
-        transforms.forEachIndexed { index, it ->
-            val h = it.scaledHeight - it.topCutoff - it.bottomCutoff
-            val w = it.scaledWidth - it.leftCutoff - it.rightCutoff
-            if (h <= 0 || w <= 0) error("Invalid slice dimensions")
-            totalHeight += h + it.topGap
-            maxWidth = maxOf(maxWidth, w)
-        }
-
-        if (totalHeight == 0 || maxWidth == 0 || bufferDimensions.stride == 0) error("Total dimensions are zero")
-
-        val targetPtr: CPointer<ByteVar> = bufferAddress.toCPointer<ByteVar>()
-            ?: throw IllegalArgumentException("Invalid target memory address")
-
-        val combinedBitmap = bufferDimensions.fpdfBitmap(bufferAddress)
-
-        try {
-            FPDFBitmap_FillRect(
-                combinedBitmap,
-                0,
-                0,
-                bufferDimensions.width,
-                bufferDimensions.height,
-                0x00000000u
-            )
-
-            var currentY = 0
-
-            transforms.forEach { transform ->
-                currentY += transform.topGap
-
-                val sliceHeight = transform.scaledHeight - transform.topCutoff - transform.bottomCutoff
-                val sliceWidth = transform.scaledWidth - transform.leftCutoff - transform.rightCutoff
-
-                FPDFBitmap_FillRect(
-                    combinedBitmap,
-                    0,
-                    currentY,
-                    sliceWidth,
-                    sliceHeight,
-                    0xFFFFFFFFu
-                )
-
-                val page = document.openPage(transform.pageIndex)
-                try {
-                    val startX = -transform.leftCutoff
-                    val startY = currentY - transform.topCutoff
-
-                    FPDF_RenderPageBitmap(
-                        combinedBitmap,
-                        page,
-                        startX,
-                        startY,
-                        transform.scaledWidth,
-                        transform.scaledHeight,
-                        0,
-                        0
-                    )
-                    /*renderPageProgressively(
-                        combinedBitmap,
-                        page,
-                        startX,
-                        startY,
-                        transform.scaledWidth,
-                        transform.scaledHeight,
-                        0,
-                        0
-                    )*/
-                } finally {
-                    page.closePage()
-                }
-                currentY += sliceHeight
-            }
-            return RenderResponse(transforms)
-
-        } finally {
-            FPDFBitmap_Destroy(combinedBitmap)
-        }
     }
 
     /**

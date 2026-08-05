@@ -1,16 +1,13 @@
 package com.dshatz.pdfmp.compose.tools
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeImageBitmap
 import com.dshatz.pdfmp.ConsumerBuffer
-import com.dshatz.pdfmp.model.calculateSize
-import com.dshatz.pdfmp.w
-import jdk.internal.org.jline.utils.Colors.h
-import org.jetbrains.skia.Bitmap
-import org.jetbrains.skia.IRect
+import org.jetbrains.skia.ColorMatrix
 
 internal actual fun ConsumerBuffer.toImageBitmap(): ImageBitmap {
     return skiaBitmap.asComposeImageBitmap()
 }
+
+internal actual val bufferColorFilter: ColorFilter = ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix())
