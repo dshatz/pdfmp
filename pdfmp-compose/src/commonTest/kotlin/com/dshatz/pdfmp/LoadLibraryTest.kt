@@ -3,9 +3,7 @@ package com.dshatz.pdfmp
 import com.dshatz.pdfmp.source.PdfSource
 import de.infix.testBalloon.framework.core.testSuite
 import io.kotest.assertions.throwables.shouldNotThrowAny
-import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.string.shouldContain
 import kotlin.random.Random
 
 val loadLibraryTest by testSuite {

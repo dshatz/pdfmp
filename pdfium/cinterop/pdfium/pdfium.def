@@ -1,0 +1,4 @@
+headers = include/fpdfview.h
+
+headerFilter = include/*
+compilerOpts = -DFPDF_EXPORT= -DFPDF_CALLCONV=

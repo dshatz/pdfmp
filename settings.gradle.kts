@@ -11,6 +11,7 @@ dependencyResolutionManagement {
         mavenLocal()
         mavenCentral()
         google()
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev/")
     }
 }
 
@@ -26,12 +27,16 @@ develocity {
 }
 
 includeBuild("build-logic")
-//include(":native-tools")
+includeBuild("pdfmp-wasmJs-plugin")
+
 include(":pdfmp")
+include(":pdfium")
 include(":pdfmp-compose")
-//include(":sample")
-include(":androidapp")
 include(":desktopapp")
+include(":androidapp")
+include(":webapp")
 include(":sample-shared")
+include(":image-buffer")
 include(":pdfium-binaries")
+include(":pdfium-wasm")
 rootProject.name = "pdf-multiplatform"
