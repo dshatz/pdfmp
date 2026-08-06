@@ -1,12 +1,13 @@
 package com.dshatz.pdfmp.source
 
+import com.dshatz.kni.annotations.JniCall
 import com.dshatz.kni.annotations.JniCallback
 import com.dshatz.kni.buffers.ByteBuffer
 
 @JniCallback
 interface CustomPdfSourceAdapter: AutoCloseable {
 
-    fun getDocumentLength(): Long
+    suspend fun getDocumentLength(): Long
 
     /**
      * Implementations must write exactly [ByteBuffer.capacity] bytes to [buffer].
@@ -15,5 +16,17 @@ interface CustomPdfSourceAdapter: AutoCloseable {
      *
      * @return how many bytes were written.
      */
-    fun readBlock(position: Long, buffer: ByteBuffer): Int
+    suspend fun readBlock(position: Long, buffer: ByteBuffer): Int
+}
+
+expect class GetLengthCallback(): AutoCloseable {
+    @JniCall
+    fun onLength(length: Long)
+    override fun close()
+}
+
+expect class ReadBlockCallback(): AutoCloseable {
+    @JniCall
+    fun onBlock(bytes: Int)
+    override fun close()
 }

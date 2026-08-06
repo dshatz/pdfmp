@@ -1,7 +1,6 @@
 package com.dshatz.pdfmp
 
 import android.graphics.Color
-import com.dshatz.pdfmp.model.BufferDimensions
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 

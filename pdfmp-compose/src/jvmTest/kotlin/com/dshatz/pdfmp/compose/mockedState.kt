@@ -3,8 +3,6 @@ package com.dshatz.pdfmp.compose
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.ui.geometry.Size
-import com.dshatz.pdfmp.InitLib
-import com.dshatz.pdfmp.PdfOperationCallback
 import com.dshatz.pdfmp.PdfRenderer
 import com.dshatz.pdfmp.compose.state.PdfState
 import com.dshatz.pdfmp.source.PdfSource

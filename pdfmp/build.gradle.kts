@@ -3,12 +3,12 @@
 import com.android.build.gradle.internal.tasks.factory.dependsOn
 import com.dshatz.kni.bundlesNatives
 import com.dshatz.kni.bundlesPrebuiltNatives
-import com.dshatz.kni.gettingOptional
-import com.dshatz.pdfmp.buildlogic.*
+import com.dshatz.pdfmp.buildlogic.configureOptional
 import com.dshatz.pdfmp.buildlogic.configureTests
-import com.dshatz.pdfmp.buildlogic.nativeTargets
+import com.dshatz.pdfmp.buildlogic.macOsTargets
 import org.gradle.internal.extensions.stdlib.capitalized
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
@@ -31,17 +31,9 @@ version = project.findProperty("version") as? String ?: "0.1.0-SNAPSHOT1"
 kni {
     autoWire {
         kspDependency.set(libs.jni.ksp)
+        createSourceSets.set(false)
     }
 }
-
-// Map KMP target names to standard pdfium lib folder.
-private val desktopTargetMap = mapOf(
-    "linuxX64"   to "linux-x64",
-    "linuxArm64" to "linux-arm64",
-    "mingwX64"   to "windows-x64",
-    "macosX64"   to "macos-x64",
-    "macosArm64" to "macos-arm64"
-)
 
 private val androidArchMap = mapOf(
     "androidNativeArm64" to "android/arm64-v8a",
@@ -90,6 +82,7 @@ private fun KotlinNativeTarget.setupSharedLib() {
     }
     // Link against pdfium
     binaries.all {
+        freeCompilerArgs += listOf("-Xadd-light-debug=enable", "-g")
         val binariesModuleDir = project(":pdfium-binaries").projectDir
         linkerOpts.add("-L$binariesModuleDir/binaries/$pdfiumPath")
         linkerOpts.add("-lpdfium")
@@ -165,36 +158,44 @@ fun KotlinNativeTarget.androidLinkerOpts() {
 }
 
 kotlin {
-    applyDefaultHierarchyTemplate()
-    jvmToolchain(21)
-    androidLibrary {
-        namespace = "com.dshatz.pdfmp"
-        compileSdk = 36
-        minSdk = 24
-
-        optimization {
-            this.consumerKeepRules.file(project.file("consumer-rules.pro"))
-        }
-
-        withDeviceTestBuilder {
-            sourceSetTreeName = "test"
-        }.configure {
-            this.instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    applyHierarchyTemplate {
+        common {
+            group("pdfium") {
+                group("native") {
+                    group("desktopNative") {
+                        withLinux()
+                        withMingw()
+                        withMacos()
+                    }
+                    group("androidNative") {
+                        withAndroidNative()
+                    }
+                    group("ios") {
+                        withIos()
+                    }
+                }
+                withWasmJs()
+            }
+            group("jniCommon") {
+                group("jniNative") {
+                    group("desktopNative")
+                    group("androidNative")
+                }
+                group("jniJvm") {
+                    withJvm()
+                    withAndroidTarget()
+                }
+            }
+            group("consumer") {
+                group("jniJvm")
+                withIos()
+                withWasmJs()
+            }
         }
     }
+    jvmToolchain(21)
 
     optionalTargets {
-        val androidTargets = listOfNotNull(
-            androidNativeX86(),
-            androidNativeX64(),
-            androidNativeArm32(),
-            androidNativeArm64()
-        )
-        configure(androidTargets) {
-            setupPdfiumCinterop()
-            setupSharedLib()
-            androidLinkerOpts()
-        }
 
         val iosTargets = listOfNotNull(
             iosX64(),
@@ -206,6 +207,32 @@ kotlin {
             setupSharedLib()
             setupIosFramework()
         }
+
+        @OptIn(ExperimentalWasmDsl::class)
+        wasmJs {
+            outputModuleName = "pdfmp"
+            this.binaries.library()
+            browser {
+                commonWebpackConfig {
+                    output?.library = "pdfmp"
+                }
+            }
+            nodejs()
+        }
+    }
+
+    val androidTargets = optionalTargets.run {
+        listOfNotNull(
+            androidNativeX86(),
+            androidNativeX64(),
+            androidNativeArm32(),
+            androidNativeArm64()
+        )
+    }
+    configure(androidTargets) {
+        setupPdfiumCinterop()
+        setupSharedLib()
+        androidLinkerOpts()
     }
 
     val desktopTargets = optionalTargets.run {
@@ -235,6 +262,32 @@ kotlin {
         }
     }
 
+    androidLibrary {
+        namespace = "com.dshatz.pdfmp"
+        compileSdk = 36
+        minSdk = 24
+
+        optimization {
+            this.consumerKeepRules.file(project.file("consumer-rules.pro"))
+        }
+
+        withDeviceTestBuilder {
+            sourceSetTreeName = "test"
+        }.configure {
+            this.instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
+
+        bundlesNatives(androidTargets)
+        bundlesPrebuiltNatives {
+            all.add(project.rootProject.layout.projectDirectory
+                .dir("pdfium-binaries")
+                .dir("binaries").dir("android"))
+            /*arm64_v8a.add(project.rootProject.layout.projectDirectory
+                .dir("image-buffer")
+            )*/
+        }
+    }
+
 
     sourceSets {
         commonMain.dependencies {
@@ -242,35 +295,32 @@ kotlin {
             implementation(libs.coroutines)
             implementation(libs.jni.annotations)
             implementation(libs.jni.buffers)
+            implementation(libs.jni.flows)
             implementation(libs.jni.serialization)
+            implementation(libs.atomic)
+            api(project(":image-buffer"))
         }
         val jniCommonMain by getting {
             dependencies {
                 api(libs.jni)
             }
         }
-        /*configureOptional("androidNativeMain") {
-            dependsOn(getByName("nativeJniMain"))
-        }*/
 
-        val (consumerMain, consumerTest) = createMainAndTest(
-            name = "consumer",
-            parent = "common"
-        )
+        androidMain.configure {
+            dependsOn(getByName("consumerMain"))
+            dependsOn(getByName("jniJvmMain"))
+        }
 
-        val (consumerJniMain, consumerJniTest) = createMainAndTest(
-            name = "consumerJni",
-            parent = "consumer",
-            "jvm", "android", "androidDevice"
-        )
-        val (desktopNativeMain, desktopNativeTest) = createMainAndTest(
-            name = "desktopNative",
-            parent = "jniNative",
-            "linux", "macos", "mingw"
-        )
-        val (nonAndroidConsumerMain, nonAndroidConsumerTest) = createMainAndTest("nonAndroidConsumer", "consumer", "jvm", "ios")
-        nonAndroidConsumerMain.dependencies {
-            implementation(libs.skiko)
+        val consumerMain by getting {
+            dependencies {
+                api(project(":image-buffer"))
+            }
+        }
+
+        val androidNativeMain by getting {
+            dependencies {
+                api(project(":image-buffer"))
+            }
         }
 
 
@@ -303,6 +353,10 @@ kotlin {
             }
             implementation("org.jetbrains.skiko:skiko-awt-runtime-$targetOs-$targetArch:$skikoVersion")
         }
+        wasmJsMain.dependencies {
+            implementation(libs.browser)
+//            api(npm("@dshatz/pdfium-wasm", "0.1.2"))
+        }
     }
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
@@ -323,95 +377,6 @@ fun NamedDomainObjectContainer<KotlinSourceSet>.createMainAndTest(name: String, 
     }
     return main to test
 }
-
-
-val packageAndroidNatives = tasks.register<Copy>("packageAndroidNatives") {
-    group = "build"
-    description = "Aggregates all native libs for Android packaging."
-    val outputDir = layout.projectDirectory.dir("src/androidMain/jniLibs")
-    into(outputDir)
-}
-
-tasks.named("androidPreBuild").dependsOn(packageAndroidNatives)
-val useDebugNatives = (project.findProperty("debug") as? String)?.toBoolean() ?: false
-val nativeBuildType = if (useDebugNatives) NativeBuildType.DEBUG else NativeBuildType.RELEASE
-
-kotlin.targets.withType<KotlinNativeTarget>().configureEach {
-    val target = this
-    val androidLibPath = androidArchMap[target.name]
-
-    if (androidLibPath != null) {
-        val abi = androidLibPath.substringAfter("android/")
-
-        target.binaries.withType<SharedLibrary>().matching {
-            it.buildType == nativeBuildType
-        }.configureEach {
-            val binary = this
-            packageAndroidNatives.configure {
-                dependsOn(binary.linkTaskProvider)
-                from(binary.outputFile) {
-                    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-                    into(abi)
-                }
-            }
-        }
-
-        val prebuiltDir = rootProject.project("pdfium-binaries").file("binaries/$androidLibPath")
-        packageAndroidNatives.configure {
-            if (prebuiltDir.exists()) {
-                from(prebuiltDir) {
-                    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-                    include("*.so")
-                    into(abi)
-                }
-            }
-        }
-    }
-}
-
-
-/*fun bundleDesktopNativeLibs(buildType: NativeBuildType) = tasks.register<Sync>("bundleDesktop${buildType.name.capitalized()}Libs") {
-    group = "build"
-    val outputDir = layout.buildDirectory.dir("generated/native-libs/${buildType.name}")
-    into(outputDir)
-
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    desktopTargetMap.forEach { (targetName, resourcePath) ->
-        val target = kotlin.targets.findByName(targetName) as? org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-        if (targetName in nativeTargets && target != null) {
-            val sharedLib = target.binaries.findSharedLib(buildType)
-            if (sharedLib != null) {
-                dependsOn(sharedLib.linkTaskProvider)
-                from(sharedLib.outputFile) {
-                    into("lib/$resourcePath")
-                }
-            }
-
-            val prebuiltDir = rootProject.project("pdfium-binaries").file("binaries/$targetName")
-            if (prebuiltDir.exists()) {
-                from(prebuiltDir) {
-                    include("*.so", "*.dll", "*.dylib")
-                    into("lib/$resourcePath")
-                }
-            }
-        }
-    }
-}*/
-/*val bundleDesktopLibs = bundleDesktopNativeLibs(nativeBuildType)
-
-kotlin.sourceSets.getByName("jvmTest") {
-    resources.srcDir(bundleDesktopLibs)
-}
-
-tasks.named<Jar>("jvmJar") {
-    from(bundleDesktopLibs)
-}*/
-
-/*tasks.withType<JavaExec>().configureEach {
-    classpath += files(bundleDesktopLibs)
-}*/
-
 
 mavenPublishing {
     signAllPublications()

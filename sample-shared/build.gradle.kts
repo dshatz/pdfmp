@@ -41,6 +41,18 @@ kotlin {
                 export(project(":pdfmp-compose"))
             }
         }
+        wasmJs {
+            browser {
+                commonWebpackConfig {
+                    outputFileName = "sample-shared"
+                }
+            }
+            binaries.library()
+        }
+        /*js {
+            browser()
+            binaries.library()
+        }*/
     }
 
     sourceSets {
@@ -54,6 +66,7 @@ kotlin {
             implementation(libs.ktor.core)
             implementation(libs.ktor.cio)
             implementation(libs.jni.buffers)
+            implementation(libs.coroutines)
         }
     }
 }

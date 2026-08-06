@@ -5,6 +5,7 @@ import com.dshatz.kni.buffers.ByteBuffer
 import com.dshatz.kni.buffers.DelicateBufferAPI
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.CustomSourceDescriptorNative
+import com.dshatz.pdfmp.source.GetLengthCallback
 import kotlinx.cinterop.Pinned
 import kotlinx.cinterop.StableRef
 import kotlinx.cinterop.UnsafeNumber
@@ -16,10 +17,12 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.staticCFunction
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.suspendCancellableCoroutine
 import platform.posix.memset
 
 @OptIn(UnsafeNumber::class, DelicateBufferAPI::class)
-fun createFileAccessFromSource(
+suspend fun createFileAccessFromSource(
     sourceObj: StableRef<CustomPdfSourceAdapter>
 ): Result<CustomSourceDescriptorNative> {
     return runCatching {
@@ -31,14 +34,16 @@ fun createFileAccessFromSource(
         fileAccess.m_Param = sourceObj.asCPointer()
         fileAccess.m_FileLen = sourceObj.get().getDocumentLength().convert()
         fileAccess.m_GetBlock = staticCFunction { p, pos, buf, sz ->
-            p!!.asStableRef<CustomPdfSourceAdapter>().get().readBlock(
-                pos.convert(),
-                ByteBuffer.wrapAddress(
-                    buf!!.reinterpret(),
-                    sz.convert(),
-                    owner = buf,
-                    finalizer = {})
-            )
+            runBlocking {
+                p!!.asStableRef<CustomPdfSourceAdapter>().get().readBlock(
+                    pos.convert(),
+                    ByteBuffer.wrapAddress(
+                        buf!!.reinterpret(),
+                        sz.convert(),
+                        owner = buf,
+                        finalizer = {})
+                )
+            }
         }
 
         CustomSourceDescriptorNative(

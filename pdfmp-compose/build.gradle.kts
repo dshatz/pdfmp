@@ -1,4 +1,6 @@
-@file:OptIn(ExperimentalComposeLibrary::class, ExperimentalKotlinGradlePluginApi::class)
+@file:OptIn(ExperimentalComposeLibrary::class, ExperimentalKotlinGradlePluginApi::class,
+    ExperimentalWasmDsl::class
+)
 
 import com.dshatz.pdfmp.buildlogic.configureTests
 import com.dshatz.pdfmp.buildlogic.iosTargets
@@ -6,6 +8,8 @@ import com.dshatz.pdfmp.buildlogic.nativeTargets
 import com.gradle.scan.agent.serialization.scan.serializer.kryo.it
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
@@ -28,6 +32,7 @@ kotlin {
             group("nonAndroid") {
                 withIos()
                 withJvm()
+                withWasmJs()
             }
             withAndroidTarget()
         }
@@ -60,7 +65,17 @@ kotlin {
                 xcf.add(this)
             }
         }
+        wasmJs {
+            outputModuleName = "pdfmp-compose"
+            binaries.library()
+            browser {
+                commonWebpackConfig {
+                    output?.library = "pdfmp-compose"
+                }
+            }
+        }
     }
+
 
     sourceSets {
         commonMain.dependencies {
@@ -82,6 +97,8 @@ kotlin {
         named("androidDeviceTest").dependencies {
             implementation(libs.test.core)
             implementation("androidx.test:runner:1.7.0")
+        }
+        wasmJsMain.dependencies {
         }
     }
     configureTests(this)
