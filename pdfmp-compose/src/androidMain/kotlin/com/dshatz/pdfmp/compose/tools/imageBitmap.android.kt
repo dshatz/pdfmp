@@ -1,15 +1,14 @@
 package com.dshatz.pdfmp.compose.tools
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.colorspace.ColorSpace
-import com.dshatz.pdfmp.ConsumerBuffer
-
-internal actual fun ConsumerBuffer.toImageBitmap(): ImageBitmap {
-    return androidBitmap.asImageBitmap()
-}
+import androidx.compose.ui.graphics.asAndroidColorFilter
+import androidx.compose.ui.graphics.drawscope.DrawContext
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.text.TextPainter.paint
+import androidx.compose.ui.unit.IntSize
+import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 
 internal actual val bufferColorFilter: ColorFilter = ColorFilter.colorMatrix(
     ColorMatrix(
@@ -21,3 +20,20 @@ internal actual val bufferColorFilter: ColorFilter = ColorFilter.colorMatrix(
         )
     )
 )
+
+actual fun DrawContext.drawPixmap(
+    buffer: ImageBuffer,
+    dstOffset: Offset,
+    dstSize: IntSize,
+) {
+    canvas.nativeCanvas.drawBitmap(
+        buffer.bitmap,
+        null,
+        android.graphics.RectF(dstOffset.x, dstOffset.y, dstOffset.x + dstSize.width, dstOffset.y + dstSize.height),
+        androidPaint
+    )
+}
+
+private val androidPaint = android.graphics.Paint().also {
+    it.colorFilter = bufferColorFilter.asAndroidColorFilter()
+}

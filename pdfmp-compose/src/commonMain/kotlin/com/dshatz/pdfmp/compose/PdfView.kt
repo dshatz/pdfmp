@@ -3,9 +3,12 @@ package com.dshatz.pdfmp.compose
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -15,30 +18,46 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.round
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
-import com.dshatz.pdfmp.ConsumerBuffer
 import com.dshatz.pdfmp.PdfTile
 import com.dshatz.pdfmp.compose.platformModifier.platformScrollableModifier
 import com.dshatz.pdfmp.compose.state.PdfState
 import com.dshatz.pdfmp.compose.tools.bufferColorFilter
+import com.dshatz.pdfmp.compose.tools.drawPixmap
 import com.dshatz.pdfmp.compose.tools.pageTransformModifier
-import com.dshatz.pdfmp.compose.tools.toImageBitmap
+import com.dshatz.pdfmp.d
+import com.dshatz.pdfmp.imagebuffer.ImageBuffer
+import com.dshatz.pdfmp.w
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import kotlin.collections.set
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Display a PDF document from the given [state].
@@ -98,55 +117,96 @@ private fun LazyListScope.fullDocumentBoxes(state: PdfState) {
 }
 
 @Composable
+private fun BoxScope.PdfTileItem(
+    tile: PdfTile,
+    buffer: ImageBuffer?,
+    pageOffsetY: Float
+) {
+    Box(
+        modifier = Modifier
+            .matchParentSize()
+            .graphicsLayer {
+                translationX = tile.key.x.toFloat()
+                translationY = tile.key.y.toFloat() + pageOffsetY
+            }
+            .drawBehind {
+                if (buffer != null) {
+                    drawContext.drawPixmap(
+                        buffer,
+                    )
+                }
+            }
+    )
+}
+
+@Composable
 private fun TiledViewport(
     state: PdfState,
     modifier: Modifier = Modifier
 ) {
     val tiles by state.visibleTiles
 
-    val renderedMap = remember { mutableStateMapOf<PdfTile, ConsumerBuffer>() }
+    val renderedMap = remember { mutableStateMapOf<PdfTile, ImageBuffer>() }
 
-    val scope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope() { Dispatchers.Default }
     for (tile in tiles) {
         key(tile) {
             DisposableEffect(tile) {
                 val job = scope.launch {
-                    val buffer = state.renderTile(tile)
-                    renderedMap[tile] = buffer
+                    try {
+                        delay(200.milliseconds)
+                        val buffer = state.renderTile(tile)
+                        buffer.reset()
+                        renderedMap[tile] = buffer
+                    } catch (e: CancellationException) {
+                        state.freeTile(tile)
+                        throw e
+                    } catch (e: Exception) {
+                        state.freeTile(tile)
+                        e.printStackTrace()
+                    }
                 }
                 onDispose {
                     job.cancel()
-                    renderedMap.remove(tile)?.let { buffer ->
-                        state.freeTile(tile)
-                    }
+                    renderedMap.remove(tile)
+                    state.freeTile(tile)
                 }
             }
         }
     }
     val display by state.layoutInfo()
     display?.let { currentDisplay ->
-        Box(modifier) {
-            Canvas(Modifier.matchParentSize().clipToBounds()) {
-                tiles.forEach { tile ->
-                    renderedMap[tile]?.let { buffer ->
-                        val pageOffset = currentDisplay.pageOffsetY(tile.key.page).value
-                        val offset = Offset(
-                            x = -currentDisplay.offsetX,
-                            y = pageOffset - currentDisplay.offsetY
-                        )
-                        drawImage(
-                            image = buffer.toImageBitmap(),
-                            topLeft = Offset(tile.key.x.toFloat(), tile.key.y.toFloat()) + offset,
-                            colorFilter = bufferColorFilter
-                        )
-                    }
+        Box(
+            modifier = modifier
+                .clipToBounds()
+                .graphicsLayer {
+                    translationX = -currentDisplay.offsetX
+                    translationY = -currentDisplay.offsetY
+                }
+        ) {
+            tiles.forEach { tile ->
+                val buffer = renderedMap[tile]
+                val pageOffsetYState = currentDisplay.pageOffsetY(tile.key.page)
+
+                key(tile) {
+                    PdfTileItem(
+                        tile = tile,
+                        buffer = buffer,
+                        pageOffsetY = pageOffsetYState.value
+                    )
                 }
             }
-            /*Text(
+
+            Text(
                 "Tiles: ${renderedMap.size}",
-                modifier = Modifier.align(Alignment.TopEnd),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .graphicsLayer {
+                        translationX = currentDisplay.offsetX
+                        translationY = currentDisplay.offsetY
+                    },
                 style = MaterialTheme.typography.headlineMedium
-            )*/
+            )
         }
     }
 }
@@ -157,44 +217,72 @@ private fun FullPages(
     state: PdfState,
     modifier: Modifier = Modifier
 ) {
-    val renderedMap = remember { mutableStateMapOf<Int, ConsumerBuffer>() }
+    val renderedMap = remember { mutableStateMapOf<Int, ImageBuffer>() }
     val visiblePages by state.visiblePages
     val scope = rememberCoroutineScope()
     for (page in visiblePages) {
         key(page.pageIdx) {
             DisposableEffect(page.pageIdx) {
                 val job = scope.launch {
-                    val buffer = state.renderFullPage(page.pageIdx)
-                    renderedMap[page.pageIdx] = buffer
+                    try {
+                        val buffer = state.renderFullPage(page.pageIdx)
+                        currentCoroutineContext().ensureActive()
+                        // The buffer may be reused from another page. Drop its cached image so the new pixels are
+                        // drawn instead of a texture cached for the old contents (same as for tiles).
+                        buffer.reset()
+                        w("Replacing buffer with new one! Old buffer: ${renderedMap[page.pageIdx]}")
+                        renderedMap[page.pageIdx] = buffer
+                    } catch (e: CancellationException) {
+                        state.freePage(page.pageIdx)
+                        throw e
+                    } catch (e: Exception) {
+                        state.freePage(page.pageIdx)
+                        e.printStackTrace()
+                    }
                 }
                 onDispose {
                     job.cancel()
-
-                    renderedMap.remove(page.pageIdx)?.let { buffer ->
-                        state.freePage(page.pageIdx)
-                    }
+                    renderedMap.remove(page.pageIdx)
+                    state.freePage(page.pageIdx)
                 }
             }
         }
     }
+    val visiblePageIndices by remember {
+        derivedStateOf {
+            visiblePages.map { it.pageIdx }
+        }
+    }
     val display by state.layoutInfo()
     display?.let { currentDisplay ->
-        Canvas(modifier.clipToBounds()) {
-            visiblePages.forEach { page ->
-                renderedMap[page.pageIdx]?.let { buffer ->
-                    val pageOffset = currentDisplay.pageOffsetY(page.pageIdx).value
-
-                    val offset = Offset(
-                        x = -currentDisplay.offsetX,
-                        y = pageOffset - currentDisplay.offsetY
-                    )
-                    val scaledWidth = state.scaledPageWidth(state.viewport, state.scale)
-                    val scaledHeigh = state.scaledPageHeight(page.pageIdx, scaledWidth)
-                    drawImage(
-                        image = buffer.toImageBitmap(),
-                        dstSize = IntSize(scaledWidth.toInt(), scaledHeigh.toInt()),
-                        dstOffset = offset.round(),
-                        colorFilter = bufferColorFilter
+        Box(
+            modifier = modifier
+                .clipToBounds()
+                .graphicsLayer {
+                    translationX = -currentDisplay.offsetX
+                    translationY = -currentDisplay.offsetY
+                }
+        ) {
+            visiblePageIndices.forEach { page ->
+                key(page) {
+                    val buffer = renderedMap[page]
+                    val pageOffset = currentDisplay.pageOffsetY(page).value
+                    Box(
+                        modifier = Modifier
+                            .graphicsLayer {
+                                translationY = pageOffset
+                                scaleX = state.scale.value
+                                scaleY = state.scale.value
+                            }
+                            .drawBehind {
+                                if (buffer != null) {
+                                    // The buffer is rendered at FULL_PAGE_RESOLUTION; stretch it to the page size.
+                                    drawContext.drawPixmap(
+                                        buffer = buffer,
+                                        dstSize = state.fullPageSize(page),
+                                    )
+                                }
+                            }
                     )
                 }
             }

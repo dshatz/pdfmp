@@ -1,0 +1,20 @@
+// pdfmp/webpack.config.d/copy_pdfium.js
+const fs = require('fs');
+const path = require('path');
+
+config.plugins = config.plugins || [];
+
+config.plugins.push({
+    apply: (compiler) => {
+        compiler.hooks.afterEmit.tap('CopyPdfiumWasmPlugin', () => {
+            const src = path.resolve(__dirname, '../../node_modules/@dshatz/pdfium-wasm/pdfium.wasm');
+            // Determine output path dynamically from webpack configuration
+            const destDir = compiler.options.output.path;
+            const dest = path.join(destDir, 'pdfium.wasm');
+
+            if (fs.existsSync(src)) {
+                fs.copyFileSync(src, dest);
+            }
+        });
+    }
+});

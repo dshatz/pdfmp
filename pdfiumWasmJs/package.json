@@ -1,0 +1,11 @@
+{
+  "name": "@dshatz/pdfium-wasm",
+  "version": "0.1.2",
+  "description": "Pdfium WebAssembly binaries",
+  "main": "pdfium.js",
+  "files": [
+    "pdfium.wasm",
+    "pdfium.js"
+  ],
+  "license": "MIT"
+}

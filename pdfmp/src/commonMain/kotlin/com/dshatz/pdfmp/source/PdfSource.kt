@@ -5,13 +5,13 @@ import com.dshatz.kni.annotations.JniSerializerFor
 import com.dshatz.kni.serialization.JniSerializer
 import com.dshatz.kni.serialization.readLenString
 import com.dshatz.kni.serialization.writeLenString
-import com.dshatz.pdfmp.model.SizeB
 import kotlinx.io.Buffer
 import kotlinx.io.files.Path
 
 @JniSerializerFor(Path::class)
 object PathSerializer: JniSerializer<Path>("kotlinx.io.files.Path") {
     override fun packToBuffer(value: Path, buffer: Buffer) {
+        println("PathSerializer pack")
         buffer.writeLenString(value.toString())
     }
 
@@ -40,7 +40,7 @@ sealed interface PdfSource {
 
         override fun dispose() {}
         override fun toString(): String {
-            return "PdfBytes(<${SizeB(bytes.size.toLong())}>)"
+            return "PdfBytes(<${bytes.size.toLong()} bytes>)"
         }
     }
     /*data class Custom(val customSourceDescriptor: CustomSourceDescriptor): PdfSource {
