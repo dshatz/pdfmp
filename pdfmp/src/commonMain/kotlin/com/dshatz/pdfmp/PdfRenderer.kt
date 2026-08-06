@@ -1,13 +1,13 @@
 package com.dshatz.pdfmp
 
 import com.dshatz.kni.annotations.JniCall
+import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 import com.dshatz.pdfmp.model.BufferInfo
 import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
-import kotlin.time.measureTimedValue
 
 expect class PdfRenderer: AutoCloseable {
 
@@ -15,75 +15,18 @@ expect class PdfRenderer: AutoCloseable {
     constructor(source: PdfSource)
 
     @JniCall
-    fun openDocument(): Result<Unit>
+    suspend fun openDocument(): Result<Unit>
 
     @JniCall
-    fun renderAsync(renderRequest: RenderRequest, callback: RenderCallback)
+    suspend fun render(page: Int, dimensions: PageDimensions, buffer: ImageBuffer)
 
     @JniCall
-    fun renderTileAsync(tile: PdfTile, bufferInfo: BufferInfo, callback: TileRenderCallback)
+    suspend fun renderTile(tile: PdfTile, buffer: ImageBuffer)
 
     @JniCall
-    fun getPageCount(callback: PdfOperationCallback)
+    suspend fun getPageCount(): Int
     @JniCall
-    fun getPageRatio(pageIndex: Int, callback: PdfOperationCallback)
+    suspend fun getPageRatio(pageIndex: Int): Float
 
     override fun close()
-}
-
-suspend fun PdfRenderer.renderSuspend(renderRequest: RenderRequest): Result<Unit> = suspendCancellableCoroutine { cont ->
-        renderAsync(renderRequest, object: RenderCallback {
-            override fun onSuccess() {
-                cont.resume(Result.success(Unit))
-            }
-
-            override fun onFailure(message: String) {
-                cont.resume(Result.failure(RuntimeException("Pdf render failed: $message")))
-            }
-
-            override fun close() {}
-        })
-    }
-
-suspend fun PdfRenderer.renderTileSuspend(tile: PdfTile, bufferInfo: BufferInfo): Result<Unit> = measureTimedValue {
-    suspendCancellableCoroutine { cont ->
-        renderTileAsync(tile, bufferInfo, object: TileRenderCallback {
-            override fun onSuccess() {
-                cont.resume(Result.success(Unit))
-            }
-
-            override fun onFailure(message: String) {
-                cont.resume(Result.failure(RuntimeException("Pdf tile render failed: $message")))
-            }
-
-            override fun close() {}
-        })
-    }
-}.also { /*d("Rendered $tile in ${it.duration}")*/ }.value
-
-suspend fun PdfRenderer.getPageCountSuspend(): Result<Int> = suspendCancellableCoroutine { cont ->
-    getPageCount(object: PdfOperationCallback {
-        override fun onPageCount(count: Result<Int>) {
-            cont.resume(count)
-        }
-
-        override fun onPageRatio(ratio: Result<Float>) {}
-
-        override fun close() {
-        }
-    })
-}
-
-
-suspend fun PdfRenderer.getPageRatioSuspend(page: Int): Result<Float> = suspendCancellableCoroutine { cont ->
-    getPageRatio(page, object: PdfOperationCallback {
-        override fun onPageCount(count: Result<Int>) {}
-
-        override fun onPageRatio(ratio: Result<Float>) {
-            cont.resume(ratio)
-        }
-
-        override fun close() {
-        }
-    })
 }

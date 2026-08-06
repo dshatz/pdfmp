@@ -24,21 +24,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.toSize
-import com.dshatz.pdfmp.ConsumerBuffer
 import com.dshatz.pdfmp.PdfTile
 import com.dshatz.pdfmp.compose.platformModifier.platformScrollableModifier
 import com.dshatz.pdfmp.compose.state.PdfState
 import com.dshatz.pdfmp.compose.tools.bufferColorFilter
 import com.dshatz.pdfmp.compose.tools.pageTransformModifier
 import com.dshatz.pdfmp.compose.tools.toImageBitmap
+import com.dshatz.pdfmp.d
+import com.dshatz.pdfmp.imagebuffer.ImageBuffer
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.collections.set
 
 /**
  * Display a PDF document from the given [state].
@@ -104,15 +107,22 @@ private fun TiledViewport(
 ) {
     val tiles by state.visibleTiles
 
-    val renderedMap = remember { mutableStateMapOf<PdfTile, ConsumerBuffer>() }
+    val renderedMap = remember { mutableStateMapOf<PdfTile, ImageBuffer>() }
 
     val scope = rememberCoroutineScope()
     for (tile in tiles) {
         key(tile) {
             DisposableEffect(tile) {
                 val job = scope.launch {
-                    val buffer = state.renderTile(tile)
-                    renderedMap[tile] = buffer
+                    try {
+                        delay(200)
+                        val buffer = state.renderTile(tile)
+                        renderedMap[tile] = buffer
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
                 onDispose {
                     job.cancel()
@@ -142,11 +152,11 @@ private fun TiledViewport(
                     }
                 }
             }
-            /*Text(
+            Text(
                 "Tiles: ${renderedMap.size}",
                 modifier = Modifier.align(Alignment.TopEnd),
                 style = MaterialTheme.typography.headlineMedium
-            )*/
+            )
         }
     }
 }
@@ -157,7 +167,7 @@ private fun FullPages(
     state: PdfState,
     modifier: Modifier = Modifier
 ) {
-    val renderedMap = remember { mutableStateMapOf<Int, ConsumerBuffer>() }
+    val renderedMap = remember { mutableStateMapOf<Int, ImageBuffer>() }
     val visiblePages by state.visiblePages
     val scope = rememberCoroutineScope()
     for (page in visiblePages) {

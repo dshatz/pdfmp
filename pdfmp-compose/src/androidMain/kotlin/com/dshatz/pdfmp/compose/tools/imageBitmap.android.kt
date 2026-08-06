@@ -4,11 +4,10 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.colorspace.ColorSpace
-import com.dshatz.pdfmp.ConsumerBuffer
+import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 
-internal actual fun ConsumerBuffer.toImageBitmap(): ImageBitmap {
-    return androidBitmap.asImageBitmap()
+internal actual fun ImageBuffer.toImageBitmap(): ImageBitmap {
+    return this.bitmap.asImageBitmap()
 }
 
 internal actual val bufferColorFilter: ColorFilter = ColorFilter.colorMatrix(
@@ -21,3 +20,4 @@ internal actual val bufferColorFilter: ColorFilter = ColorFilter.colorMatrix(
         )
     )
 )
+

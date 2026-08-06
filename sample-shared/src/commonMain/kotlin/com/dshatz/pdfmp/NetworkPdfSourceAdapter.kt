@@ -2,6 +2,8 @@ package com.dshatz.pdfmp
 
 import com.dshatz.kni.buffers.ByteBuffer
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
+import com.dshatz.pdfmp.source.GetLengthCallback
+import com.dshatz.pdfmp.source.ReadBlockCallback
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.get
@@ -11,8 +13,9 @@ import io.ktor.client.statement.readBytes
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentLength
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 
 class NetworkPdfSourceAdapter(
     private val url: String,
@@ -22,19 +25,26 @@ class NetworkPdfSourceAdapter(
     private val chunkSize = 64 * 1024 // 64KB
     private val chunkCache = mutableMapOf<Int, ByteArray>()
 
-    private val length: Long by lazy {
-
-        runBlocking(Dispatchers.IO) {
-            val response = client.head(url) {
-                expectSuccess = true
-            }
-            response.contentLength() ?: error("No content length")
+    private var documentLength: Long? = null
+    private suspend fun fetchLength(): Long {
+        val response = client.head(url) {
+            expectSuccess = true
+        }
+//        documentLength = response.contentLength() ?: error("No content length")
+        return (response.contentLength() ?: error("No content length")).also {
+            documentLength = it
         }
     }
 
-    override fun getDocumentLength(): Long = length
+    override suspend fun getDocumentLength(): Long {
+        return fetchLength()
+        /*documentLength?.let(callback::onLength) ?: scope.launch {
+            fetchLength()
+            callback.onLength(documentLength!!)
+        }*/
+    }
 
-    override fun readBlock(position: Long, buffer: ByteBuffer): Int = runBlocking {
+    override suspend fun readBlock(position: Long, buffer: ByteBuffer): Int {
         val size = buffer.capacity.toInt()
         val result = ByteArray(size)
         var bytesCopied = 0
@@ -59,14 +69,14 @@ class NetworkPdfSourceAdapter(
             bytesCopied += toCopy
         }
         buffer.write(result)
-        bytesCopied
+        return bytesCopied
     }
 
 
     private suspend fun getOrFetchChunk(index: Int): ByteArray {
         return chunkCache.getOrPut(index) {
             val start = index.toLong() * chunkSize
-            val end = minOf(start + chunkSize - 1, length - 1)
+            val end = minOf(start + chunkSize - 1, documentLength!! - 1)
 
             val response = client.get(url) {
                 header(HttpHeaders.Range, "bytes=$start-$end")
@@ -77,7 +87,7 @@ class NetworkPdfSourceAdapter(
             }
 
             val bytes = response.readBytes()
-            if (bytes.size < chunkSize && (start + bytes.size) < length) {
+            if (bytes.size < chunkSize && (start + bytes.size) < documentLength!!) {
                 val fullChunk = ByteArray(chunkSize)
                 bytes.copyInto(fullChunk)
                 fullChunk

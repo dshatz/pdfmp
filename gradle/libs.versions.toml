@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.3.20"
-jni = "1.0.5-SNAPSHOT"
+jni = "1.0.10-SNAPSHOT"
 agp = "9.0.1"
 publish = "0.35.0"
 skiko = "0.9.22.2"
@@ -20,19 +20,24 @@ compose = { id = "org.jetbrains.compose", version = "1.10.0" }
 publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
 testballoon = { id = "de.infix.testBalloon", version.ref = "testballoon" }
 kni = { id = "com.dshatz.kni", version.ref = "jni" }
+wasmplugin = { id = "com.dshatz.wasm-plugin", version = "" }
 
 [libraries]
 jni = { module = "com.dshatz.kni:jni", version.ref = "jni" }
 jni-buffers = { module = "com.dshatz.kni:buffers", version.ref = "jni" }
+jni-flows = { module = "com.dshatz.kni:flows", version.ref = "jni" }
 jni-serialization = { module = "com.dshatz.kni:serialization", version.ref = "jni" }
 jni-ksp = { module = "com.dshatz.kni:ksp", version.ref = "jni" }
 jni-annotations = { module = "com.dshatz.kni:annotations", version.ref = "jni" }
+jni-wrappers = { module = "com.dshatz.kni:wrappers", version.ref = "jni" }
 io = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version = "0.8.2" }
 
 test-core = { module = "de.infix.testBalloon:testBalloon-framework-core", version = "testballoon" }
 test-kotest = { module = "de.infix.testBalloon:testBalloon-integration-kotest-assertions", version.ref = "testballoon" }
 ktor-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version = "0.5.0" }
+atomic = { module = "org.jetbrains.kotlinx:atomicfu", version = "0.33.0" }
 
 # For zero-copy bitmap on desktop.
 skiko = { module = "org.jetbrains.skiko:skiko", version.ref = "skiko" }
