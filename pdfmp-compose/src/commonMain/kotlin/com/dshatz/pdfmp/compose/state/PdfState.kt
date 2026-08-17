@@ -16,6 +16,7 @@ import com.dshatz.pdfmp.model.PageTransform
 import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.model.RenderResponse
 import com.dshatz.pdfmp.source.PdfSource
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -341,46 +342,66 @@ data class PdfState(
         // Otherwise native will receive 0x0 size and crash.
         if (transforms.isEmpty()) return null
 
-        val buffer = bufferPool.getBufferViewport(transforms)
-        return withContext(Dispatchers.IO) {
-            buffer.withAddress {
-                val response = renderer.render(
-                    RenderRequest(
-                        transforms,
-                        pageSpacing,
-                        topOffset,
-                        buffer.dimensions.withAddress(it),
+        // Buffer acquisition and address access can fail (allocation failure, disposed buffer).
+        // Contain those like render failures — set the error state instead of letting the
+        // exception escape the render coroutine (on Kotlin/Native an uncaught worker exception
+        // kills the process).
+        return try {
+            val buffer = bufferPool.getBufferViewport(transforms)
+            withContext(Dispatchers.IO) {
+                buffer.withAddress {
+                    val response = renderer.render(
+                        RenderRequest(
+                            transforms,
+                            pageSpacing,
+                            topOffset,
+                            buffer.dimensions.withAddress(it),
+                        )
                     )
-                )
-                response.map { resp ->
-                    resp to buffer
-                }.onFailure { error ->
-                    this@PdfState.error.value = error
-                    e("Failed to render viewport", error)
-                }.getOrNull()
+                    response.map { resp ->
+                        resp to buffer
+                    }.onFailure { error ->
+                        this@PdfState.error.value = error
+                        e("Failed to render viewport", error)
+                    }.getOrNull()
+                }
             }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (t: Throwable) {
+            this@PdfState.error.value = t
+            e("Failed to prepare viewport buffer", t)
+            null
         }
     }
 
     internal suspend fun renderFullPage(transform: PageTransform): Pair<RenderResponse, ConsumerBuffer>? {
-        val buffer = bufferPool.getBufferPage(transform)
-        return withContext(Dispatchers.IO) {
-            buffer.withAddress {
-                val response = renderer.render(
-                    RenderRequest(
-                        listOf(transform),
-                        0,
-                        0,
-                        buffer.dimensions.withAddress(it)
+        return try {
+            val buffer = bufferPool.getBufferPage(transform)
+            withContext(Dispatchers.IO) {
+                buffer.withAddress {
+                    val response = renderer.render(
+                        RenderRequest(
+                            listOf(transform),
+                            0,
+                            0,
+                            buffer.dimensions.withAddress(it)
+                        )
                     )
-                )
-                response.map { resp ->
-                    resp to buffer
-                }.onFailure { error ->
-                    this@PdfState.error.value = error
-                    e("Failed to render pages", error)
-                }.getOrNull()
+                    response.map { resp ->
+                        resp to buffer
+                    }.onFailure { error ->
+                        this@PdfState.error.value = error
+                        e("Failed to render pages", error)
+                    }.getOrNull()
+                }
             }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (t: Throwable) {
+            this@PdfState.error.value = t
+            e("Failed to prepare page buffer", t)
+            null
         }
     }
 

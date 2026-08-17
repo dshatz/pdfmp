@@ -105,11 +105,17 @@ private fun PdfViewport(
         delay(100)
         state.renderViewport(transforms)?.let {
             val (response, buffer) = it
+            val previous = value
             value = CurrentImage(
                 transforms,
                 response.transforms,
                 buffer
             )
+            // Release the replaced image's buffer so the pool can dispose retired buffers.
+            // Skip when the pool handed back the same buffer (reuse path).
+            if (previous != null && previous.buffer !== buffer) {
+                previous.free()
+            }
         }
     }
 
