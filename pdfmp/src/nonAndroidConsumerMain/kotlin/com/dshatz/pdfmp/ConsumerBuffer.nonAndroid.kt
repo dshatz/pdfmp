@@ -56,7 +56,12 @@ actual object ConsumerBufferUtil {
         )
 
         val skiaBitmap = Bitmap()
-        skiaBitmap.allocPixels(imageInfo)
+        // allocPixels returns false on failure (invalid/oversized dimensions, out of memory);
+        // ignoring it hands out a pixel-less bitmap whose peekPixels() returns null, and the
+        // consumer then fails later with a misleading "Could not read bitmap buffer address".
+        check(skiaBitmap.allocPixels(imageInfo)) {
+            "Failed to allocate a $width x $height pixel buffer (${size.stringMB})"
+        }
         return ConsumerBuffer(skiaBitmap)
     }
 }

@@ -83,8 +83,13 @@ val consumerBufferTest by testSuite {
             val largerBuffer = pool.getBufferViewport(transformsLarger)
             largerBuffer shouldNotBe buffer
 
-            withClue("Old viewport should have been freed after replacement") {
-                buffer.isFree shouldBe true
+            withClue(
+                "Replaced viewport buffer must be retired, not disposed — an in-flight render " +
+                    "or the displayed image may still hold it. It stays unfree until its " +
+                    "consumer releases it."
+            ) {
+                buffer.isFree shouldBe false
+                pool.retiredViewportBuffers shouldBe listOf(buffer)
             }
         }
     }
