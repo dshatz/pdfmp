@@ -11,6 +11,16 @@ data class RenderRequest(
     val pageSpacing: Int,
     val topOffset: Int,
     val bufferInfo: BufferInfo,
+    /**
+     * Whether annotations should be drawn (pdfium's `FPDF_ANNOT`).
+     *
+     * Defaults to `true` because that is what every other PDF viewer does. It also matters for
+     * correctness rather than decoration: a PAdES visible signature is a widget annotation whose
+     * appearance stream holds the signature image, and the page content itself is left untouched
+     * when a document is signed. With annotations off, a signed document renders pixel-identically
+     * to the unsigned one.
+     */
+    val renderAnnotations: Boolean = true,
 ) {
     fun pack(): ByteArray {
         val buffer = Buffer()
@@ -21,6 +31,7 @@ data class RenderRequest(
         buffer.writeInt(pageSpacing)
         buffer.writeInt(topOffset)
         bufferInfo.pack(buffer)
+        buffer.writeByte(if (renderAnnotations) 1 else 0)
 
         return buffer.readByteArray()
     }
@@ -37,12 +48,14 @@ data class RenderRequest(
             val pageSpacing = buffer.readInt()
             val topOffset = buffer.readInt()
             val bufferInfo = BufferInfo.unpack(buffer)
+            val renderAnnotations = buffer.readByte().toInt() != 0
 
             return RenderRequest(
                 imageTransforms,
                 pageSpacing,
                 topOffset,
-                bufferInfo
+                bufferInfo,
+                renderAnnotations
             )
         }
     }

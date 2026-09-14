@@ -56,7 +56,8 @@ actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
             renderPages(
                 renderRequest.transforms,
                 renderRequest.bufferInfo.address,
-                renderRequest.bufferInfo.dimensions
+                renderRequest.bufferInfo.dimensions,
+                renderRequest.renderAnnotations
             )
         }
     }
@@ -78,7 +79,8 @@ actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
     private fun renderPages(
         transforms: List<PageTransform>,
         bufferAddress: Long,
-        bufferDimensions: BufferDimensions
+        bufferDimensions: BufferDimensions,
+        renderAnnotations: Boolean
     ): RenderResponse {
         val document = getDocument()
 
@@ -146,7 +148,7 @@ actual class PdfRenderer(private val source: PdfSource): SynchronizedObject() {
                         transform.scaledWidth,
                         transform.scaledHeight,
                         0,
-                        0
+                        if (renderAnnotations) FPDF_ANNOT else 0
                     )
                 } finally {
                     FPDF_ClosePage(page)

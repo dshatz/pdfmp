@@ -42,6 +42,24 @@ fun TestSuite.packTests() {
         RenderRequest.unpack(bytes) shouldBe input
     }
 
+    test("pack render request with annotations disabled") {
+        // `renderAnnotations` defaults to true, so a dropped field would still round-trip in the
+        // test above. Only the non-default value proves it is actually written and read back.
+        val input = RenderRequest(
+            transforms = generateSequence { randomPageTransform() }.take(Random.nextInt(10)).toList(),
+            0,
+            0,
+            BufferDimensions(
+                100,
+                200,
+                400
+            ).withAddress(1),
+            renderAnnotations = false,
+        )
+        val bytes = input.pack()
+        RenderRequest.unpack(bytes) shouldBe input
+    }
+
 
     test("pack failure throwing") {
         val result = Result.failure<Unit>(RuntimeException("native message"))

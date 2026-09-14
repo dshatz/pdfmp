@@ -29,11 +29,20 @@ import kotlin.time.ExperimentalTime
 fun rememberPdfState(
     pdfSource: PdfSource,
     pageRange: IntRange = 0..Int.MAX_VALUE,
-    pageSpacing: Dp = 0.dp
+    pageSpacing: Dp = 0.dp,
+    renderAnnotations: Boolean = true
 ): PdfState {
     val scope = rememberCoroutineScope()
     val pageSpacingPx = with(LocalDensity.current) { pageSpacing.toPx().toInt() }
-    val state = remember { PdfState(pdfSource, pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
+    val state = remember {
+        PdfState(
+            pdfSource,
+            pageRange = pageRange,
+            pageSpacing = pageSpacingPx,
+            renderAnnotations = renderAnnotations,
+            scope = scope
+        )
+    }
     state.OpenDisposableDocument()
     return state
 }
@@ -45,6 +54,8 @@ data class PdfState(
     private val scale: MutableState<Float> = mutableFloatStateOf(1f),
     internal val viewport: MutableState<Size> = mutableStateOf(Size(1f, 1f)),
     val pageSpacing: Int = 0,
+    /** See [RenderRequest.renderAnnotations]. */
+    val renderAnnotations: Boolean = true,
     private val scope: CoroutineScope
 ) {
     private lateinit var renderer: PdfRenderer
@@ -350,6 +361,7 @@ data class PdfState(
                         pageSpacing,
                         topOffset,
                         buffer.dimensions.withAddress(it),
+                        renderAnnotations,
                     )
                 )
                 response.map { resp ->
@@ -371,7 +383,8 @@ data class PdfState(
                         listOf(transform),
                         0,
                         0,
-                        buffer.dimensions.withAddress(it)
+                        buffer.dimensions.withAddress(it),
+                        renderAnnotations
                     )
                 )
                 response.map { resp ->
