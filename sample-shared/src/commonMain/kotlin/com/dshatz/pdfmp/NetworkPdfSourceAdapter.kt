@@ -2,8 +2,6 @@ package com.dshatz.pdfmp
 
 import com.dshatz.kni.buffers.ByteBuffer
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
-import com.dshatz.pdfmp.source.GetLengthCallback
-import com.dshatz.pdfmp.source.ReadBlockCallback
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.get
@@ -13,9 +11,6 @@ import io.ktor.client.statement.readBytes
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentLength
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 class NetworkPdfSourceAdapter(
     private val url: String,

@@ -11,7 +11,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -29,10 +28,9 @@ import com.dshatz.pdfmp.PdfTile
 import com.dshatz.pdfmp.TileKey
 import com.dshatz.pdfmp.d
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
-import com.dshatz.pdfmp.model.BufferInfo
-import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -460,16 +458,9 @@ data class PdfState(
         }
         val (buffer, needsRender) = bufferPool.getBufferTile(tile)
         if (needsRender) {
-            buffer.withAddress {
-                measureTime {
-                    renderer!!.renderTile(tile, BufferInfo(
-                        width = buffer.width,
-                        height = buffer.height,
-                        stride = buffer.stride,
-                        address = it
-                    ))
-                }.also { d("Tile rendered in ${it.absoluteValue}: $tile") }
-            }
+            measureTime {
+                renderer!!.renderTile(tile, buffer)
+            }.also { d("Tile rendered in ${it.absoluteValue}: $tile") }
         }
         return buffer
     }
@@ -491,21 +482,11 @@ data class PdfState(
         val (buffer, needsRender) = bufferPool.getBufferPage(page, pageDimensions)
 
         if (needsRender) {
-            buffer.withAddress {
-                d("Using buffer address: $it")
-                renderer!!.render(
-                    RenderRequest(
-                        page,
-                        pageDimensions,
-                        BufferInfo(
-                            buffer.width,
-                            buffer.height,
-                            buffer.stride,
-                            it
-                        )
-                    )
-                )
-            }
+            renderer!!.render(
+                page,
+                pageDimensions,
+                buffer
+            )
         }
         return buffer
     }
@@ -538,6 +519,7 @@ data class PdfState(
     internal suspend fun initPages(renderer: PdfRenderer): Result<Unit> {
         return runCatching { renderer.getPageCount() }.mapCatching { count ->
             val range = (0..<count)
+            d("initPages: page range: $range, limit: $pageRange")
             val truncated = range.withIndex()
                 .drop(pageRange.first).take(min(pageRange.last - pageRange.first, count - pageRange.first) + 1)
             val map = linkedMapOf<Int, PdfPageState>()
@@ -554,8 +536,7 @@ data class PdfState(
     internal suspend fun openDocument(renderer: PdfRenderer) {
         this.renderer = renderer
         try {
-
-            runCatching { renderer.openDocument() }.mapCatching {
+            runCatching { renderer.openDocument().getOrThrow() }.mapCatching {
                 bufferPool = ImageBufferPool()
             }.onFailure {
                 d("Failed to open document: $it")
@@ -566,6 +547,10 @@ data class PdfState(
                 isInitialized.value = true
             }
             awaitCancellation()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            e.printStackTrace()
         } finally {
             d("Closing renderer")
             isInitialized.value = false

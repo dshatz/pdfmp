@@ -1,9 +1,6 @@
 package com.dshatz.pdfmp
 
-import com.dshatz.kni.annotations.JniCall
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
-import com.dshatz.pdfmp.model.BufferInfo
-import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.pdfium.DataPointer
 import com.dshatz.pdfmp.pdfium.DocHandle
 import com.dshatz.pdfmp.pdfium.PageHandle
@@ -11,24 +8,29 @@ import com.dshatz.pdfmp.pdfium.PdfClip
 import com.dshatz.pdfmp.pdfium.PdfMatrix
 import com.dshatz.pdfmp.pdfium.Pdfium
 import com.dshatz.pdfmp.pdfium.PdfiumBitmap
-import com.dshatz.pdfmp.pdfium.closePage
-import com.dshatz.pdfmp.pdfium.destroy
-import com.dshatz.pdfmp.pdfium.fillRect
-import com.dshatz.pdfmp.pdfium.getPageHeight
-import com.dshatz.pdfmp.pdfium.getPageWidth
-import com.dshatz.pdfmp.pdfium.openPage
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-abstract class PdfiumRenderer: AutoCloseable {
+interface IPDfRenderer: AutoCloseable {
+
+    suspend fun getPageCount(): Int
+    suspend fun renderTile(tile: PdfTile, buffer: ImageBuffer)
+    suspend fun getPageRatio(pageIndex: Int): Float
+    suspend fun openDocument(): Result<Unit>
+}
+abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
     private val drawTileFrames: Boolean = true
 
     val pdfiumDispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)
 
     protected lateinit var doc: DocHandle
 
+    protected fun isDocLoaded(): Boolean = this::doc.isInitialized
+
     protected fun isDocInitialized() = this::doc.isInitialized
+
+    protected val pageHandleCache = mutableMapOf<Int, PageHandle>()
 
     protected fun ImageBuffer.fpdfBitmap(address: Long): PdfiumBitmap {
         return Pdfium.BitmapCreateExBGRA(
@@ -39,13 +41,18 @@ abstract class PdfiumRenderer: AutoCloseable {
         ) ?: error("Failed to create combined bitmap wrapper")
     }
 
-    abstract fun <R> ImageBuffer.withFpdfBitmap(block: (bitmap: PdfiumBitmap) -> R)
+    protected abstract suspend fun <R> ImageBuffer.withFpdfBitmap(block: suspend (bitmap: PdfiumBitmap) -> R)
 
-    private fun DocHandle.openPageOrThrow(pageIndex: Int): PageHandle {
-        return this.openPage(pageIndex) ?: run {
-            error("Failed to load page $pageIndex: ${getLastErrorForCustomSource() ?: Pdfium.GetLastError()}")
+    private suspend fun DocHandle.openPageOrThrow(pageIndex: Int): PageHandle {
+        return pageHandleCache.getOrPut(pageIndex) {
+            openPage(pageIndex) ?: run {
+                error("Failed to load page $pageIndex: ${getLastErrorForCustomSource() ?: Pdfium.GetLastError()}")
+            }
         }
     }
+
+    protected abstract suspend fun DocHandle.openPage(pageIndex: Int): PageHandle?
+    protected abstract fun PageHandle.closePage()
 
     protected fun getLastErrorForCustomSource(): String? {
         return null // TODO
@@ -58,7 +65,7 @@ abstract class PdfiumRenderer: AutoCloseable {
      * @param color ARGB color format (e.g., 0xFF0000FFu for Blue, 0xFFFF0000u for Red)
      * @param strokeWidth Border width in pixels
      */
-    private fun PdfiumBitmap.drawFrame(
+    private suspend fun PdfiumBitmap.drawFrame(
         width: Int,
         height: Int,
         color: UInt = 0xFF0000FFu, // Default: Solid Blue
@@ -76,12 +83,43 @@ abstract class PdfiumRenderer: AutoCloseable {
 
     abstract override fun close()
 
-    suspend fun getPageCount(): Int = withContext(pdfiumDispatcher) {
+    abstract suspend fun PdfiumBitmap.fillRect(
+        left: Int,
+        top: Int,
+        width: Int,
+        height: Int,
+        color: UInt
+    )
+
+    abstract suspend fun PdfiumBitmap.destroy()
+
+    protected abstract suspend fun RenderPageBitmap(
+        bitmap: PdfiumBitmap,
+        page: PageHandle,
+        startX: Int,
+        startY: Int,
+        sizeX: Int,
+        sizeY: Int,
+        rotate: Int,
+        flags: Int
+    )
+
+    protected abstract suspend fun RenderPageBitmapWithMatrix(
+        bitmap: PdfiumBitmap,
+        page: PageHandle,
+        matrix: PdfMatrix,
+        clip: PdfClip,
+        flags: Int
+    )
+
+
+    override suspend fun getPageCount(): Int = withContext(pdfiumDispatcher) {
         Pdfium.GetPageCount(doc)
     }
 
-    suspend fun renderTile(tile: PdfTile, buffer: ImageBuffer) {
+    override suspend fun renderTile(tile: PdfTile, buffer: ImageBuffer) {
         withContext(pdfiumDispatcher) {
+            /*block(500)*/
             buffer.withFpdfBitmap { bitmap ->
                 val page = doc.openPageOrThrow(tile.key.page)
                 val result = runCatching {
@@ -116,7 +154,7 @@ abstract class PdfiumRenderer: AutoCloseable {
                         PdfTile.WIDTH.toFloat(),
                         PdfTile.HEIGHT.toFloat()
                     )
-                    Pdfium.RenderPageBitmapWithMatrix(
+                    RenderPageBitmapWithMatrix(
                         bitmap,
                         page,
                         matrix,
@@ -131,13 +169,15 @@ abstract class PdfiumRenderer: AutoCloseable {
                         )
                     }
                 }
-                page.closePage()
                 result.getOrThrow()
             }
         }
     }
 
-    suspend fun getPageRatio(pageIndex: Int): Float = withContext(pdfiumDispatcher) {
+    abstract suspend fun PageHandle.getPageWidth(): Float
+    abstract suspend fun PageHandle.getPageHeight(): Float
+
+    override suspend fun getPageRatio(pageIndex: Int): Float = withContext(pdfiumDispatcher) {
         val result = runCatching {
             val page = doc.openPageOrThrow(pageIndex)
             try {
@@ -148,7 +188,6 @@ abstract class PdfiumRenderer: AutoCloseable {
                 }
                 width / height
             } finally {
-                page.closePage()
             }
         }.recoverCatching {
             val customSourceError = getLastErrorForCustomSource()
@@ -170,7 +209,7 @@ abstract class PdfiumRenderer: AutoCloseable {
                     dimensions.height,
                     0xFFFFFFFFu
                 )
-                Pdfium.RenderPageBitmap(
+                RenderPageBitmap(
                     bitmap,
                     page,
                     0,
@@ -181,7 +220,6 @@ abstract class PdfiumRenderer: AutoCloseable {
                     0
                 )
             }
-            page.closePage()
             result.getOrThrow()
         }
     }

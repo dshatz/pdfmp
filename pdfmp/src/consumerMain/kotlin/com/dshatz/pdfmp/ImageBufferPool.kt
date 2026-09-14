@@ -28,7 +28,6 @@ class ImageBufferPool {
     private val pageBufferLock = ReentrantLock()
 
     fun getBufferPage(page: Int, dimensions: PageDimensions): Pair<ImageBuffer, Boolean> = pageBufferLock.withLock {
-        val neededCapacity = (dimensions.width * dimensions.height * 4L).bytes
         val existing = pageBuffers[page]
         if (existing != null) {
             if (existing.dimensions == dimensions) {
@@ -46,6 +45,7 @@ class ImageBufferPool {
             } else {
                 val newBuffer = ImageBufferUtil.allocate(dimensions.width, dimensions.height)
                 pageBuffers[page] = PageBuffer(newBuffer, dimensions)
+                printBufferSpace()
                 return newBuffer to true
             }
         }
@@ -53,7 +53,9 @@ class ImageBufferPool {
 
     fun freePageBuffer(page: Int) = pageBufferLock.withLock {
         val freed = pageBuffers.remove(page)
+        freed?.buffer?.reset()
         freed?.let { freePageBuffers.add(it.buffer) }
+        printBufferSpace()
     }
 
     private val tileBufferLock = ReentrantLock()
@@ -64,7 +66,6 @@ class ImageBufferPool {
         if (existing != null) {
             if (existing.renderedPageDimensions == tile.scaledPage) {
                 // Existing tile buffer was already filled by this tile at the same scale.
-                w("Not repainting $tile")
                 return existing.buffer to false
             }
             else {
@@ -77,10 +78,9 @@ class ImageBufferPool {
         else {
             val free = freeTileBuffers.firstOrNull()
             free?.let { freeTileBuffers.remove(it) }
-            val freshBuffer = free ?: ImageBufferUtil.allocate(w, h).also {
-//                printBufferSpace()
-            }
+            val freshBuffer = free ?: ImageBufferUtil.allocate(w, h)
             tilePool[tile.key] = TileBuffer(freshBuffer, tile.scaledPage)
+            printBufferSpace()
             return freshBuffer to true
         }
     }
@@ -88,14 +88,20 @@ class ImageBufferPool {
     fun freeTileBuffer(tile: PdfTile) = tileBufferLock.withLock {
         val used = tilePool[tile.key]
         used?.let { tileBuffer ->
+            tileBuffer.buffer.reset()
             tilePool.remove(tile.key)
             freeTileBuffers += tileBuffer.buffer
         }
+        printBufferSpace()
     }
 
     private fun printBufferSpace() {
         val usedSize = tilePool.values.sumOf { (it.buffer.width * it.buffer.stride) }.bytes
         val freeSize = freeTileBuffers.sumOf { it.width * it.stride }.bytes
         d("Tile buffers: used = ${usedSize.stringMB}; free = ${freeSize.stringMB}")
+
+        val usedPageSize = pageBuffers.values.sumOf { it.buffer.width * it.buffer.stride }.bytes
+        val freePageSize = freePageBuffers.sumOf { it.width * it.stride }.bytes
+        d("Page buffers: used = ${usedPageSize.stringMB}; free = ${freePageSize.stringMB}")
     }
 }

@@ -1,21 +1,19 @@
 package com.dshatz.pdfmp
 
-import com.dshatz.internal.pdfium.FPDF_GetLastError
 import com.dshatz.kni.annotations.JniCall
 import com.dshatz.pdfmp.error.FileError
 import com.dshatz.pdfmp.error.PdfiumException
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 import com.dshatz.pdfmp.imagebuffer.WritableImageBuffer
-import com.dshatz.pdfmp.model.BufferInfo
 import com.dshatz.pdfmp.pdfium.DataPointer
 import com.dshatz.pdfmp.pdfium.DocHandle
 import com.dshatz.pdfmp.pdfium.FileAccess
 import com.dshatz.pdfmp.pdfium.PageHandle
+import com.dshatz.pdfmp.pdfium.PdfClip
+import com.dshatz.pdfmp.pdfium.PdfMatrix
 import com.dshatz.pdfmp.pdfium.Pdfium
 import com.dshatz.pdfmp.pdfium.PdfiumBitmap
 import com.dshatz.pdfmp.pdfium.close
-import com.dshatz.pdfmp.pdfium.destroy
-import com.dshatz.pdfmp.pdfium.openPage
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -24,7 +22,9 @@ import kotlinx.cinterop.StableRef
 import kotlinx.cinterop.UnsafeNumber
 import kotlinx.cinterop.pin
 import kotlinx.cinterop.toLong
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 
 
 @OptIn(ExperimentalForeignApi::class)
@@ -90,7 +90,7 @@ actual class PdfRenderer: PdfiumRenderer {
 
     @JniCall
     @OptIn(UnsafeNumber::class)
-    actual suspend fun openDocument(): Result<Unit> {
+    actual override suspend fun openDocument(): Result<Unit> {
         return runCatching {
             d("Source: $source")
             doc = createDocumentHandle()
@@ -99,23 +99,70 @@ actual class PdfRenderer: PdfiumRenderer {
         }
     }
 
-    @OptIn(UnsafeNumber::class)
-    private fun DocInstance.openPage(pageIndex: Int): PageHandle {
-        return this.handle.openPage(pageIndex) ?: run {
-            error("Failed to load page $pageIndex: ${getLastErrorForCustomSource() ?: FPDF_GetLastError()}")
+    override suspend fun <R> ImageBuffer.withFpdfBitmap(block: suspend (bitmap: PdfiumBitmap) -> R) {
+        try {
+            (this as WritableImageBuffer).withWritableAddress {
+                val bitmap = fpdfBitmap(it.toLong())
+                runBlocking {
+                    try {
+                        block(bitmap)
+                    } finally {
+                        bitmap.destroy()
+                    }
+                }
+            }
+        } finally {
+            (this as? AutoCloseable)?.close()
         }
+    }
+
+    override suspend fun DocHandle.openPage(pageIndex: Int): PageHandle? {
+        return Pdfium.LoadPage(doc, pageIndex)
+    }
+
+    override fun PageHandle.closePage() {
+        Pdfium.ClosePage(this)
+    }
+
+    override suspend fun PdfiumBitmap.fillRect(left: Int, top: Int, width: Int, height: Int, color: UInt) {
+        Pdfium.BitmapFillRect(this, left, top, width, height, color)
+    }
+
+    override suspend fun PdfiumBitmap.destroy() {
+        Pdfium.BitmapDestroy(this)
+    }
+
+    override suspend fun RenderPageBitmap(
+        bitmap: PdfiumBitmap,
+        page: PageHandle,
+        startX: Int,
+        startY: Int,
+        sizeX: Int,
+        sizeY: Int,
+        rotate: Int,
+        flags: Int
+    ) {
+        Pdfium.RenderPageBitmap(
+            bitmap,
+            page,
+            startX,
+            startY,
+            sizeX,
+            sizeY,
+            rotate,
+            flags
+        )
 
     }
 
-    override fun <R> ImageBuffer.withFpdfBitmap(block: (bitmap: PdfiumBitmap) -> R) {
-        (this as WritableImageBuffer).withWritableAddress {
-            val bitmap = fpdfBitmap(it.toLong())
-            try {
-                block(bitmap)
-            } finally {
-                bitmap.destroy()
-            }
-        }
+    override suspend fun RenderPageBitmapWithMatrix(
+        bitmap: PdfiumBitmap,
+        page: PageHandle,
+        matrix: PdfMatrix,
+        clip: PdfClip,
+        flags: Int
+    ) {
+        Pdfium.RenderPageBitmapWithMatrix(bitmap, page, matrix, clip, flags)
     }
 
     /**
@@ -123,6 +170,11 @@ actual class PdfRenderer: PdfiumRenderer {
      */
     actual override fun close() {
         runCatching {
+            pageHandleCache.forEach {
+                it.value.closePage()
+            }
+            pageHandleCache.clear()
+
             if (isDocInitialized()) {
                 doc.close()
             }
@@ -133,5 +185,13 @@ actual class PdfRenderer: PdfiumRenderer {
         }.onFailure {
             e("Could not close document", it)
         }
+    }
+
+    override suspend fun PageHandle.getPageWidth(): Float {
+        return Pdfium.GetPageWidthF(this)
+    }
+
+    override suspend fun PageHandle.getPageHeight(): Float {
+        return Pdfium.GetPageHeightF(this)
     }
 }

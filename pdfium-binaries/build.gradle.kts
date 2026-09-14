@@ -1,10 +1,29 @@
+@file:OptIn(ExperimentalWasmDsl::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     id("base")
     id("maven-publish")
+    alias(libs.plugins.mp)
 }
 
 group = "com.dshatz"
 
+kotlin {
+    jvmToolchain(21)
+    applyDefaultHierarchyTemplate()
+    wasmJs {
+        browser()
+        binaries.library()
+    }
+
+    sourceSets {
+        wasmJsMain.configure {
+            resources.srcDir(layout.projectDirectory.dir("binaries/wasmJs"))
+        }
+    }
+}
 
 val linuxJar by tasks.registering(Jar::class) {
     // This is the classifier that consumers will use

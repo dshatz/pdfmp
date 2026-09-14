@@ -5,8 +5,6 @@ import com.dshatz.kni.buffers.ByteBuffer
 import com.dshatz.kni.buffers.DelicateBufferAPI
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.CustomSourceDescriptorNative
-import com.dshatz.pdfmp.source.GetLengthCallback
-import kotlinx.cinterop.Pinned
 import kotlinx.cinterop.StableRef
 import kotlinx.cinterop.UnsafeNumber
 import kotlinx.cinterop.alloc
@@ -18,7 +16,6 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.staticCFunction
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.suspendCancellableCoroutine
 import platform.posix.memset
 
 @OptIn(UnsafeNumber::class, DelicateBufferAPI::class)

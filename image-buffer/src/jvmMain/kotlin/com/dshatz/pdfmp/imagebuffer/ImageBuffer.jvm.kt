@@ -10,7 +10,7 @@ import org.jetbrains.skia.ImageInfo
 import org.jetbrains.skia.Pixmap
 import org.jetbrains.skia.impl.Managed
 
-@JniAdapter(BitmapAdapter::class)
+@JniAdapter(ImageBufferAdapter::class)
 actual data class ImageBuffer(
     val pixmap: Pixmap
 ) : IImageBuffer {
@@ -19,10 +19,11 @@ actual data class ImageBuffer(
     actual override val stride: Int = pixmap.rowBytes
 }
 
-object BitmapAdapter: JvmJniAdapter<ImageBuffer, SkBitmapInfo> {
+actual object ImageBufferAdapter: JvmJniAdapter<ImageBuffer, SkBitmapInfo> {
     override fun getJniValue(value: ImageBuffer): SkBitmapInfo {
+        val addr = value.pixmap.buffer.writableData()
         return SkBitmapInfo(
-            value.pixmap.addr,
+            addr,
             value.width,
             value.height,
             value.stride
@@ -30,8 +31,10 @@ object BitmapAdapter: JvmJniAdapter<ImageBuffer, SkBitmapInfo> {
     }
 
     override fun fromJniValue(value: SkBitmapInfo): ImageBuffer {
+        val addr = value.ptr
+        println("Received buffer address $addr from jvm")
         val data = Data.makeWithoutCopy(
-            value.ptr,
+            addr,
             length = value.strideBytes * value.height,
             object: Managed(value.ptr, 0, false) {}
         )

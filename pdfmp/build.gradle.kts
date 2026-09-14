@@ -1,6 +1,6 @@
-@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class, ExperimentalWasmDsl::class)
 
-import com.android.build.gradle.internal.tasks.factory.dependsOn
+import com.dshatz.jsworker.asWebWorker
 import com.dshatz.kni.bundlesNatives
 import com.dshatz.kni.bundlesPrebuiltNatives
 import com.dshatz.pdfmp.buildlogic.configureOptional
@@ -11,8 +11,6 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-import org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType
-import org.jetbrains.kotlin.gradle.plugin.mpp.SharedLibrary
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 
 plugins {
@@ -20,8 +18,10 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.publish)
     alias(libs.plugins.kni)
+    alias(libs.plugins.serial)
     alias(libs.plugins.android.lib)
     alias(libs.plugins.testballoon)
+    alias(libs.plugins.jsworker)
     jacoco
 }
 
@@ -174,7 +174,10 @@ kotlin {
                         withIos()
                     }
                 }
-                withWasmJs()
+                group("web") {
+                    withWasmJs()
+                    withJs()
+                }
             }
             group("jniCommon") {
                 group("jniNative") {
@@ -189,7 +192,7 @@ kotlin {
             group("consumer") {
                 group("jniJvm")
                 withIos()
-                withWasmJs()
+                group("web")
             }
         }
     }
@@ -212,6 +215,7 @@ kotlin {
         wasmJs {
             outputModuleName = "pdfmp"
             this.binaries.library()
+            asWebWorker()
             browser {
                 commonWebpackConfig {
                     output?.library = "pdfmp"
@@ -219,6 +223,7 @@ kotlin {
             }
             nodejs()
         }
+
     }
 
     val androidTargets = optionalTargets.run {
@@ -282,12 +287,8 @@ kotlin {
             all.add(project.rootProject.layout.projectDirectory
                 .dir("pdfium-binaries")
                 .dir("binaries").dir("android"))
-            /*arm64_v8a.add(project.rootProject.layout.projectDirectory
-                .dir("image-buffer")
-            )*/
         }
     }
-
 
     sourceSets {
         commonMain.dependencies {
@@ -298,6 +299,7 @@ kotlin {
             implementation(libs.jni.flows)
             implementation(libs.jni.serialization)
             implementation(libs.atomic)
+            implementation(libs.serial)
             api(project(":image-buffer"))
         }
         val jniCommonMain by getting {
@@ -353,17 +355,27 @@ kotlin {
             }
             implementation("org.jetbrains.skiko:skiko-awt-runtime-$targetOs-$targetArch:$skikoVersion")
         }
-        wasmJsMain.dependencies {
-            implementation(libs.browser)
-//            api(npm("@dshatz/pdfium-wasm", "0.1.2"))
+        webMain.dependencies {
+            implementation(project(":pdfium-wasm"))
+            implementation(libs.skiko.fresh)
+        }
+
+        getByName("pdfiumMain").dependencies {
+            api(project(":pdfium"))
         }
     }
     compilerOptions {
-        freeCompilerArgs.add("-Xexpect-actual-classes")
+        freeCompilerArgs.addAll("-Xexpect-actual-classes", "-XXLanguage:+JsAllowExportingSuspendFunctions")
         optIn.add("kotlinx.cinterop.ExperimentalForeignApi")
     }
     project.configureTests(this)
 }
+
+dependencies {
+//    "kspJs"(libs.jsworker.ksp)
+    "wasmJsWorker"(project(":pdfium-wasm"))
+}
+
 
 fun NamedDomainObjectContainer<KotlinSourceSet>.createMainAndTest(name: String, parent: String, vararg dependants: String): Pair<KotlinSourceSet, KotlinSourceSet> {
     val main = create("${name}Main")

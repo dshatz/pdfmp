@@ -4,8 +4,12 @@ import com.dshatz.kni.JNIEnvVar
 import com.dshatz.kni.JavaVMVar
 import com.dshatz.kni.annotations.JniAdapter
 import com.dshatz.kni.binding.jobject
+import com.dshatz.kni.utils.NewGlobalRef
+import com.dshatz.kni.utils.DeleteGlobalRef
 import com.dshatz.kni.utils.WithAttachedThread
 import com.dshatz.kni.utils.getJavaVM
+import kotlin.experimental.ExperimentalNativeApi
+import kotlin.native.ref.createCleaner
 import kotlinx.cinterop.COpaquePointerVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -20,14 +24,14 @@ import platform.android.AndroidBitmap_lockPixels
 import platform.android.AndroidBitmap_unlockPixels
 
 @OptIn(ExperimentalForeignApi::class)
-@JniAdapter(adapter = BitmapAdapter::class)
+@JniAdapter(adapter = ImageBufferAdapter::class)
 actual data class ImageBuffer(
     val bitmap: jobject,
     actual override val width: Int,
     actual override val height: Int,
     actual override val stride: Int,
     val jvm: CPointer<JavaVMVar>
-): IImageBuffer, WritableImageBuffer {
+): IImageBuffer, WritableImageBuffer, AutoCloseable {
     fun <R> useLocked(block: (address: CPointer<*>) -> R) {
         return jvm.WithAttachedThread { env ->
             memScoped {
@@ -45,20 +49,31 @@ actual data class ImageBuffer(
     override fun <R> withWritableAddress(block: (address: CPointer<*>) -> R) {
         return useLocked(block)
     }
+
+    override fun close() {
+        jvm.WithAttachedThread { env ->
+            println("Deleting Global Ref for ImageBuffer")
+            env.DeleteGlobalRef(bitmap)
+        }
+    }
+
+    actual override fun reset() {
+
+    }
 }
 
 @OptIn(ExperimentalForeignApi::class)
-object BitmapAdapter :
-    com.dshatz.kni.wrapper.NativeJniAdapter<ImageBuffer, com.dshatz.kni.binding.jobject> {
+actual object ImageBufferAdapter :
+    com.dshatz.kni.wrapper.NativeJniAdapter<ImageBuffer, jobject> {
     override fun fromJni(
         env: CPointer<JNIEnvVar>,
-        value: com.dshatz.kni.binding.jobject
+        value: jobject
     ): ImageBuffer {
         return memScoped {
             val bitmapInfo = alloc<AndroidBitmapInfo>()
             AndroidBitmap_getInfo(env, value, bitmapInfo.ptr)
             ImageBuffer(
-                value,
+                env.NewGlobalRef(value),
                 bitmapInfo.width.convert(),
                 bitmapInfo.height.convert(),
                 bitmapInfo.stride.convert<Int>(),

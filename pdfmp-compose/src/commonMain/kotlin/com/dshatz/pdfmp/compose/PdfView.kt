@@ -24,19 +24,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.round
 import androidx.compose.ui.unit.toSize
 import com.dshatz.pdfmp.PdfTile
 import com.dshatz.pdfmp.compose.platformModifier.platformScrollableModifier
 import com.dshatz.pdfmp.compose.state.PdfState
 import com.dshatz.pdfmp.compose.tools.bufferColorFilter
+import com.dshatz.pdfmp.compose.tools.drawPixmap
 import com.dshatz.pdfmp.compose.tools.pageTransformModifier
-import com.dshatz.pdfmp.compose.tools.toImageBitmap
-import com.dshatz.pdfmp.d
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -78,7 +75,7 @@ fun PdfView(
                 state,
                 modifier = Modifier.matchParentSize()
             )
-            TiledViewport(state, Modifier.matchParentSize())
+//            TiledViewport(state, Modifier.matchParentSize())
         }
     }
 }
@@ -109,7 +106,7 @@ private fun TiledViewport(
 
     val renderedMap = remember { mutableStateMapOf<PdfTile, ImageBuffer>() }
 
-    val scope = rememberCoroutineScope()
+    val scope = rememberCoroutineScope() { Dispatchers.Default }
     for (tile in tiles) {
         key(tile) {
             DisposableEffect(tile) {
@@ -144,9 +141,9 @@ private fun TiledViewport(
                             x = -currentDisplay.offsetX,
                             y = pageOffset - currentDisplay.offsetY
                         )
-                        drawImage(
-                            image = buffer.toImageBitmap(),
-                            topLeft = Offset(tile.key.x.toFloat(), tile.key.y.toFloat()) + offset,
+                        drawContext.drawPixmap(
+                            buffer,
+                            dstOffset = Offset(tile.key.x.toFloat(), tile.key.y.toFloat()) + offset,
                             colorFilter = bufferColorFilter
                         )
                     }
@@ -200,10 +197,10 @@ private fun FullPages(
                     )
                     val scaledWidth = state.scaledPageWidth(state.viewport, state.scale)
                     val scaledHeigh = state.scaledPageHeight(page.pageIdx, scaledWidth)
-                    drawImage(
-                        image = buffer.toImageBitmap(),
+                    drawContext.drawPixmap(
+                        buffer,
+                        dstOffset = offset,
                         dstSize = IntSize(scaledWidth.toInt(), scaledHeigh.toInt()),
-                        dstOffset = offset.round(),
                         colorFilter = bufferColorFilter
                     )
                 }

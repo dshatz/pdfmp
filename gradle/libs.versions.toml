@@ -1,13 +1,13 @@
 [versions]
 kotlin = "2.3.20"
-jni = "1.0.10-SNAPSHOT"
+#jni = "1.0.16-SNAPSHOT"
+jni = "2.3.0-beta04"
+jsworker = "1.0.32-SNAPSHOT"
 agp = "9.0.1"
 publish = "0.35.0"
 skiko = "0.9.22.2"
-kotest = "6.1.0"
 ktor = "3.4.0"
-osdetect = "1.7.3"
-testballoon = "0.8.4-K2.3.0"
+testballoon = "1.1.0"
 
 [plugins]
 mp = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -16,11 +16,13 @@ android-lib = { id = "com.android.kotlin.multiplatform.library", version.ref = "
 android-app = { id = "com.android.application", version.ref = "agp" }
 ksp = { id = "com.google.devtools.ksp", version = "2.3.7" }
 compose-kt = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-compose = { id = "org.jetbrains.compose", version = "1.10.0" }
+compose = { id = "org.jetbrains.compose", version = "1.12.2" }
 publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
 testballoon = { id = "de.infix.testBalloon", version.ref = "testballoon" }
 kni = { id = "com.dshatz.kni", version.ref = "jni" }
 wasmplugin = { id = "com.dshatz.wasm-plugin", version = "" }
+serial = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+jsworker = { id = "com.dshatz.jsworker", version.ref = "jsworker" }
 
 [libraries]
 jni = { module = "com.dshatz.kni:jni", version.ref = "jni" }
@@ -30,7 +32,10 @@ jni-serialization = { module = "com.dshatz.kni:serialization", version.ref = "jn
 jni-ksp = { module = "com.dshatz.kni:ksp", version.ref = "jni" }
 jni-annotations = { module = "com.dshatz.kni:annotations", version.ref = "jni" }
 jni-wrappers = { module = "com.dshatz.kni:wrappers", version.ref = "jni" }
-io = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version = "0.8.2" }
+jsworker-workers = { module = "com.dshatz.jsworker:workers", version.ref = "jsworker" }
+jsworker-ksp = { module = "com.dshatz.jsworker:ksp", version.ref = "jsworker" }
+io = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version = "0.9.1" }
+serial = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = "1.11.0" }
 
 test-core = { module = "de.infix.testBalloon:testBalloon-framework-core", version = "testballoon" }
 test-kotest = { module = "de.infix.testBalloon:testBalloon-integration-kotest-assertions", version.ref = "testballoon" }
@@ -41,10 +46,11 @@ atomic = { module = "org.jetbrains.kotlinx:atomicfu", version = "0.33.0" }
 
 # For zero-copy bitmap on desktop.
 skiko = { module = "org.jetbrains.skiko:skiko", version.ref = "skiko" }
+skiko-fresh = { module = "org.jetbrains.skiko:skiko", version = "0.150.2" }
 
 # Android
 appcompat = { module = "androidx.appcompat:appcompat", version = "1.7.1" }
 activity-compose = { module = "androidx.activity:activity-compose", version = "1.13.0" }
 
-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.11.0" }
-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version = "1.11.0" }
+coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.10.0" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version = "1.10.0" }

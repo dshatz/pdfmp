@@ -3,13 +3,9 @@
 )
 
 import com.dshatz.pdfmp.buildlogic.configureTests
-import com.dshatz.pdfmp.buildlogic.iosTargets
-import com.dshatz.pdfmp.buildlogic.nativeTargets
-import com.gradle.scan.agent.serialization.scan.serializer.kryo.it
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
@@ -97,8 +93,6 @@ kotlin {
         named("androidDeviceTest").dependencies {
             implementation(libs.test.core)
             implementation("androidx.test:runner:1.7.0")
-        }
-        wasmJsMain.dependencies {
         }
     }
     configureTests(this)

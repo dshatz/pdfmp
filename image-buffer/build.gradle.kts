@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.mp)
     alias(libs.plugins.kni)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.serial)
     alias(libs.plugins.android.lib)
     jacoco
 }
@@ -53,9 +54,13 @@ kotlin {
                 group("skiko") {
                     withJvm()
                     withIos()
-                    withWasmJs()
                     group("desktopNative")
                 }
+                group("web") {
+                    withJs()
+                    withWasmJs()
+                }
+
             }
             group("jniJvm") {
                 group("android")
@@ -78,6 +83,11 @@ kotlin {
         iosX64()
         iosArm64()
         wasmJs {
+            binaries.library()
+            browser()
+        }
+
+        js(IR) {
             binaries.library()
             browser()
         }
@@ -126,7 +136,7 @@ kotlin {
     sourceSets {
         val skikoMain by getting {
             dependencies {
-                api(libs.skiko)
+                implementation(libs.skiko)
             }
         }
         val androidMain by getting {
@@ -137,8 +147,16 @@ kotlin {
             dependencies {
                 api(libs.jni.wrappers)
                 implementation(libs.jni.serialization)
-                implementation(libs.jni.annotations)
             }
+        }
+
+        commonMain.dependencies {
+            implementation(libs.jni.annotations)
+        }
+
+        webMain.dependencies {
+            implementation(libs.serial)
+            implementation(libs.skiko)
         }
     }
     compilerOptions {

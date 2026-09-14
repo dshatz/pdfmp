@@ -12,8 +12,8 @@ import org.jetbrains.skia.Canvas
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.Pixmap
 
-internal actual fun ImageBuffer.toImageBitmap(): ImageBitmap {
+/*internal actual fun ImageBuffer.toImageBitmap(): ImageBitmap {
     return skiaBitmap.asComposeImageBitmap()
-}
+}*/
 
-internal actual val bufferColorFilter: ColorFilter = ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix())
+/*internal actual val bufferColorFilter: ColorFilter = ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix())*/

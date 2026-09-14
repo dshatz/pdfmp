@@ -16,7 +16,7 @@ import org.jetbrains.skia.Pixmap
 import org.jetbrains.skia.impl.Managed
 import org.jetbrains.skia.impl.NativePointer
 
-@JniAdapter(adapter = BitmapAdapter::class)
+@JniAdapter(adapter = ImageBufferAdapter::class)
 actual data class ImageBuffer(
     val pixmap: Pixmap
 ): IImageBuffer, WritableImageBuffer {
@@ -25,12 +25,12 @@ actual data class ImageBuffer(
     actual override val stride: Int = pixmap.rowBytes
 
     override fun <R> withWritableAddress(block: (address: CPointer<*>) -> R) {
-        block(pixmap.addr.toLong().toCPointer<ByteVar>()!!)
+        block(pixmap.buffer.writableData().toLong().toCPointer<ByteVar>()!!)
     }
 }
 
 @OptIn(ExperimentalForeignApi::class)
-object BitmapAdapter :
+actual object ImageBufferAdapter :
     NativeJniAdapter<ImageBuffer, SkBitmapInfo> {
     override fun fromJni(
         env: CPointer<JNIEnvVar>,

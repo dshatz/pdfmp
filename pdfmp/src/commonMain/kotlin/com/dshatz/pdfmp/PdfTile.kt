@@ -1,8 +1,10 @@
 package com.dshatz.pdfmp
 
 import com.dshatz.kni.annotations.JniSerializable
+import kotlinx.serialization.Serializable
 
 @JniSerializable
+@Serializable
 data class PdfTile(
     val key: TileKey,
     val scaledPage: PageDimensions
@@ -13,6 +15,7 @@ data class PdfTile(
     }
 }
 
+@Serializable
 @JniSerializable
 data class TileKey(
     val page: Int,
@@ -20,6 +23,7 @@ data class TileKey(
     val y: Int
 )
 
+@Serializable
 @JniSerializable
 data class PageDimensions(
     val width: Int,
