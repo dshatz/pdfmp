@@ -20,7 +20,7 @@ interface IPDfRenderer: AutoCloseable {
     suspend fun openDocument(): Result<Unit>
 }
 abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
-    private val drawTileFrames: Boolean = true
+    private val drawTileFrames: Boolean = false
 
     val pdfiumDispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1)
 

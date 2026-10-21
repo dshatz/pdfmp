@@ -7,15 +7,9 @@ import androidx.compose.ui.graphics.drawscope.DrawContext
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.IntSize
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
-import org.jetbrains.skia.ColorMatrix
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.Paint
 
-/*
-internal actual fun ImageBuffer.toImageBitmap(): ImageBitmap {
-    this.pixmap.
-    Bitmap().asComposeImageBitmap()
-}*/
 actual fun DrawContext.drawPixmap(
     buffer: ImageBuffer,
     dstOffset: Offset,

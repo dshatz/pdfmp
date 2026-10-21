@@ -56,10 +56,6 @@ actual data class ImageBuffer(
             env.DeleteGlobalRef(bitmap)
         }
     }
-
-    actual override fun reset() {
-
-    }
 }
 
 @OptIn(ExperimentalForeignApi::class)

@@ -53,7 +53,6 @@ class ImageBufferPool {
 
     fun freePageBuffer(page: Int) = pageBufferLock.withLock {
         val freed = pageBuffers.remove(page)
-        freed?.buffer?.reset()
         freed?.let { freePageBuffers.add(it.buffer) }
         printBufferSpace()
     }
@@ -88,7 +87,6 @@ class ImageBufferPool {
     fun freeTileBuffer(tile: PdfTile) = tileBufferLock.withLock {
         val used = tilePool[tile.key]
         used?.let { tileBuffer ->
-            tileBuffer.buffer.reset()
             tilePool.remove(tile.key)
             freeTileBuffers += tileBuffer.buffer
         }

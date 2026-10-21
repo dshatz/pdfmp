@@ -22,7 +22,7 @@ kotlin {
     }
     androidLibrary {
         namespace = "com.dshatz.pdfmp.sampleshared"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 24
         androidResources.enable = true
     }

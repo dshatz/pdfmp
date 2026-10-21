@@ -2,12 +2,8 @@ package com.dshatz.pdfmp
 
 import com.dshatz.kni.annotations.JniCall
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
-import com.dshatz.pdfmp.model.BufferInfo
-import com.dshatz.pdfmp.model.RenderRequest
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
 
 expect class PdfRenderer: AutoCloseable {
 

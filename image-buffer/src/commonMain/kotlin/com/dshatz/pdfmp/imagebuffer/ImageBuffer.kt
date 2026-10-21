@@ -8,7 +8,6 @@ expect class ImageBuffer: IImageBuffer {
     override val width: Int
     override val height: Int
     override val stride: Int
-    override fun reset()
 }
 
 expect object ImageBufferAdapter
@@ -18,5 +17,4 @@ interface IImageBuffer {
     val height: Int
     val stride: Int
 
-    fun reset()
 }

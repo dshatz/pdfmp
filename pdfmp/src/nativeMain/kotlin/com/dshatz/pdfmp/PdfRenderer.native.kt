@@ -22,8 +22,6 @@ import kotlinx.cinterop.StableRef
 import kotlinx.cinterop.UnsafeNumber
 import kotlinx.cinterop.pin
 import kotlinx.cinterop.toLong
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 
 

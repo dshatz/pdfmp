@@ -1,6 +1,7 @@
 package com.dshatz.pdfmp.imagebuffer
 
 import com.dshatz.kni.annotations.JniAdapter
+import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.Data
@@ -15,23 +16,14 @@ actual data class ImageBuffer(
     actual override val stride: Int,
     val data: Data,
 ) : IImageBuffer {
-    val pixmap = Pixmap.make(
-        ImageInfo(width, height, ColorType.RGBA_8888, ColorAlphaType.PREMUL),
-        buffer = data,
-        rowBytes = stride
-    )
+    private val imageInfo = ImageInfo.makeN32(width, height, ColorAlphaType.PREMUL)
 
     private var _image: Image? = null
     val image: Image get() {
         if (_image == null) {
-            _image = Image.makeFromPixmap(pixmap)
+            _image = Image.makeRaster(imageInfo, data, stride)
         }
         return _image!!
-    }
-
-    actual override fun reset() {
-        _image?.close()
-        _image = null
     }
 }
 

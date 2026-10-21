@@ -28,8 +28,7 @@ class PdfiumWebWorker: IPdfium by Pdfium {
 
     @OptIn(ExperimentalWasmJsInterop::class)
     @TransferOwnership
-    fun bitmapAsArrayBuffer(bitmap: PdfiumBitmap): ArrayBuffer {
-        val buffer = makeBuffer(bitmap.bytes)
+    fun bitmapAsArrayBuffer(@TransferOwnership buffer: ArrayBuffer, bitmap: PdfiumBitmap): ArrayBuffer {
         copyPdfiumToBuffer(bitmap.memoryPtr.ptr, buffer, bitmap.bytes)
         return buffer.unsafeCast()
     }

@@ -476,8 +476,8 @@ data class PdfState(
     internal suspend fun renderFullPage(page: Int): ImageBuffer {
         if (page !in pageRatios) pageRatios[page] = renderer!!.getPageRatio(page)
 
-        val pageWidth = scaledPageWidth(viewport, scale)
-        val pageHeight = scaledPageHeight(page, pageWidth)
+        val pageWidth = viewport.value.width
+        val pageHeight = pageWidth / pageRatios[page]!!
         val pageDimensions = PageDimensions(pageWidth.toInt(), pageHeight.toInt())
         val (buffer, needsRender) = bufferPool.getBufferPage(page, pageDimensions)
 
@@ -490,25 +490,6 @@ data class PdfState(
         }
         return buffer
     }
-
-    /*@Composable
-    internal fun produceImageTransforms(): State<List<PageTransform>> {
-        return derivedStateOf {
-            visiblePages.value.map {
-                PageTransform(
-                    pageIndex = it.pageIdx,
-                    topCutoff = it.topCutoff.toInt(),
-                    bottomCutoff = it.bottomCutoff.toInt(),
-                    leftCutoff = it.leftCutoff,
-                    rightCutoff = it.rightCutoff,
-                    scaledWidth = it.scaledWidth.toInt(),
-                    scaledHeight = it.scaledHeight.toInt(),
-                    topGap = it.topGap,
-                    scale = scale.value
-                )
-            }
-        }
-    }*/
 
     internal val visibleTiles = derivedStateOf {
         if (isInitialized.value) {

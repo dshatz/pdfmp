@@ -222,6 +222,9 @@ kotlin {
                 }
             }
             nodejs()
+            compilerOptions {
+                freeCompilerArgs.add("-Xwasm-debugger-custom-formatters")
+            }
         }
 
     }
@@ -269,7 +272,7 @@ kotlin {
 
     androidLibrary {
         namespace = "com.dshatz.pdfmp"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 24
 
         optimization {
@@ -296,7 +299,7 @@ kotlin {
             implementation(libs.coroutines)
             implementation(libs.jni.annotations)
             implementation(libs.jni.buffers)
-            implementation(libs.jni.flows)
+            api(libs.jni.flows)
             implementation(libs.jni.serialization)
             implementation(libs.atomic)
             implementation(libs.serial)
@@ -365,7 +368,7 @@ kotlin {
         }
     }
     compilerOptions {
-        freeCompilerArgs.addAll("-Xexpect-actual-classes", "-XXLanguage:+JsAllowExportingSuspendFunctions")
+        freeCompilerArgs.addAll("-Xexpect-actual-classes")
         optIn.add("kotlinx.cinterop.ExperimentalForeignApi")
     }
     project.configureTests(this)
