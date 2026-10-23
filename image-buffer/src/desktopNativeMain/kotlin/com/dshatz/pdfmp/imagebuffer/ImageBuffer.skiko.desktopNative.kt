@@ -23,6 +23,13 @@ actual data class ImageBuffer(
     actual override val width: Int = pixmap.info.width
     actual override val height: Int = pixmap.info.height
     actual override val stride: Int = pixmap.rowBytes
+    actual override fun close() {
+        // jvm will close and skiko will call native.
+    }
+
+    actual override fun reset() {
+
+    }
 
     override fun <R> withWritableAddress(block: (address: CPointer<*>) -> R) {
         block(pixmap.buffer.writableData().toLong().toCPointer<ByteVar>()!!)

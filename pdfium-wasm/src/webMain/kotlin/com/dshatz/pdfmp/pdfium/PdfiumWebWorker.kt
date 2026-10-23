@@ -3,6 +3,7 @@ package com.dshatz.pdfmp.pdfium
 import com.dshatz.jsworker.JSWorker
 import com.dshatz.jsworker.TransferOwnership
 import com.dshatz.pdfmp.Ptr
+import com.dshatz.pdfmp.pdfium.Pdfium.free
 import com.dshatz.pdfmp.writeWasmByte
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
@@ -23,6 +24,10 @@ class PdfiumWebWorker: IPdfium by Pdfium {
             it.printStackTrace()
             Ptr(0u)
         }.getOrThrow()
+    }
+
+    fun releaseDocumentBytes(ptr: Ptr) {
+        ptr.free()
     }
 
 

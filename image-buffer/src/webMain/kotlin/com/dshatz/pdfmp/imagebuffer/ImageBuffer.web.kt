@@ -25,6 +25,16 @@ actual data class ImageBuffer(
         }
         return _image!!
     }
+
+    actual override fun close() {
+        _image?.close()
+        data.close()
+    }
+
+    actual override fun reset() {
+        _image?.close()
+        _image = null
+    }
 }
 
 actual object ImageBufferAdapter

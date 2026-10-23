@@ -50,11 +50,16 @@ actual data class ImageBuffer(
         return useLocked(block)
     }
 
-    override fun close() {
+    actual override fun close() {
         jvm.WithAttachedThread { env ->
+            // android (jvm) will release the bitmap itself.
             println("Deleting Global Ref for ImageBuffer")
             env.DeleteGlobalRef(bitmap)
         }
+    }
+
+    actual override fun reset() {
+
     }
 }
 

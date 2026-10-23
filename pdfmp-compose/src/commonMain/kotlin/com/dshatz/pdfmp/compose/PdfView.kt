@@ -57,6 +57,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Display a PDF document from the given [state].
@@ -132,7 +133,6 @@ private fun BoxScope.PdfTileItem(
                 if (buffer != null) {
                     drawContext.drawPixmap(
                         buffer,
-                        colorFilter = bufferColorFilter
                     )
                 }
             }
@@ -154,20 +154,22 @@ private fun TiledViewport(
             DisposableEffect(tile) {
                 val job = scope.launch {
                     try {
-                        delay(200)
+                        delay(200.milliseconds)
                         val buffer = state.renderTile(tile)
+                        buffer.reset()
                         renderedMap[tile] = buffer
                     } catch (e: CancellationException) {
+                        state.freeTile(tile)
                         throw e
                     } catch (e: Exception) {
+                        state.freeTile(tile)
                         e.printStackTrace()
                     }
                 }
                 onDispose {
                     job.cancel()
-                    renderedMap.remove(tile)?.let { buffer ->
-                        state.freeTile(tile)
-                    }
+                    renderedMap.remove(tile)
+                    state.freeTile(tile)
                 }
             }
         }
@@ -222,17 +224,23 @@ private fun FullPages(
         key(page.pageIdx) {
             DisposableEffect(page.pageIdx) {
                 val job = scope.launch {
-                    val buffer = state.renderFullPage(page.pageIdx)
-                    currentCoroutineContext().ensureActive()
-                    w("Replacing buffer with new one! Old buffer: ${renderedMap[page.pageIdx]}")
-                    renderedMap[page.pageIdx] = buffer
+                    try {
+                        val buffer = state.renderFullPage(page.pageIdx)
+                        currentCoroutineContext().ensureActive()
+                        w("Replacing buffer with new one! Old buffer: ${renderedMap[page.pageIdx]}")
+                        renderedMap[page.pageIdx] = buffer
+                    } catch (e: CancellationException) {
+                        state.freePage(page.pageIdx)
+                        throw e
+                    } catch (e: Exception) {
+                        state.freePage(page.pageIdx)
+                        e.printStackTrace()
+                    }
                 }
                 onDispose {
                     job.cancel()
-
-                    renderedMap.remove(page.pageIdx)?.let { buffer ->
-                        state.freePage(page.pageIdx)
-                    }
+                    renderedMap.remove(page.pageIdx)
+                    state.freePage(page.pageIdx)
                 }
             }
         }
@@ -267,7 +275,6 @@ private fun FullPages(
                                 if (buffer != null) {
                                     drawContext.drawPixmap(
                                         buffer = buffer,
-                                        colorFilter = bufferColorFilter
                                     )
                                 }
                             }

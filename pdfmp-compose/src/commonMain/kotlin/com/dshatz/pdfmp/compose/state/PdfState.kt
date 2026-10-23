@@ -537,6 +537,7 @@ data class PdfState(
             isInitialized.value = false
             withContext(NonCancellable) {
                 renderer.close()
+                bufferPool.close()
             }
         }
     }

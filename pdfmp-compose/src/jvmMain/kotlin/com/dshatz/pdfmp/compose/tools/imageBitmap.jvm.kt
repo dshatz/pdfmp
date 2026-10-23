@@ -14,17 +14,17 @@ actual fun DrawContext.drawPixmap(
     buffer: ImageBuffer,
     dstOffset: Offset,
     dstSize: IntSize,
-    colorFilter: ColorFilter?
 ) {
-    val paint = Paint().also {
-        it.colorFilter = colorFilter?.asSkiaColorFilter()
-    }
     val img = Image.makeFromPixmap(buffer.pixmap)
     canvas.nativeCanvas.drawImageRect(
         img,
         dst = org.jetbrains.skia.Rect(dstOffset.x, dstOffset.y, dstOffset.x + dstSize.width, dstOffset.y + dstSize.height),
-        paint
+        jvmPaint
     )
 }
 
 internal actual val bufferColorFilter: ColorFilter = ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix())
+
+private val jvmPaint = Paint().also {
+    it.colorFilter = bufferColorFilter.asSkiaColorFilter()
+}

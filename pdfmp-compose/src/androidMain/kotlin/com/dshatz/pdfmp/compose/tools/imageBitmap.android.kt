@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.drawscope.DrawContext
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.text.TextPainter.paint
 import androidx.compose.ui.unit.IntSize
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 
@@ -24,15 +25,15 @@ actual fun DrawContext.drawPixmap(
     buffer: ImageBuffer,
     dstOffset: Offset,
     dstSize: IntSize,
-    colorFilter: ColorFilter?
 ) {
-    val paint = android.graphics.Paint().also {
-        it.colorFilter = colorFilter?.asAndroidColorFilter()
-    }
     canvas.nativeCanvas.drawBitmap(
         buffer.bitmap,
         null,
         android.graphics.RectF(dstOffset.x, dstOffset.y, dstOffset.x + dstSize.width, dstOffset.y + dstSize.height),
-        paint
+        androidPaint
     )
+}
+
+private val androidPaint = android.graphics.Paint().also {
+    it.colorFilter = bufferColorFilter.asAndroidColorFilter()
 }

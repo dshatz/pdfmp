@@ -21,7 +21,6 @@ actual fun DrawContext.drawPixmap(
     buffer: ImageBuffer,
     dstOffset: Offset,
     dstSize: IntSize,
-    colorFilter: ColorFilter?
 ) {
     canvas.skiaCanvas.drawImageRect(
         image = buffer.image,

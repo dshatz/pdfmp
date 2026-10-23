@@ -11,8 +11,7 @@ import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 expect fun DrawContext.drawPixmap(
     buffer: ImageBuffer,
     dstOffset: Offset = Offset.Zero,
-    dstSize: IntSize = IntSize(buffer.width, buffer.height),
-    colorFilter: ColorFilter? = null
+    dstSize: IntSize = IntSize(buffer.width, buffer.height)
 )
 
 internal expect val bufferColorFilter: ColorFilter

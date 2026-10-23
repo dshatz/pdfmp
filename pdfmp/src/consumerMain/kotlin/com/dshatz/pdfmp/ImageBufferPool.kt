@@ -102,4 +102,15 @@ class ImageBufferPool {
         val freePageSize = freePageBuffers.sumOf { it.width * it.stride }.bytes
         d("Page buffers: used = ${usedPageSize.stringMB}; free = ${freePageSize.stringMB}")
     }
+
+    fun close() {
+        tilePool.values.forEach {
+            it.buffer.close()
+        }
+        pageBuffers.values.forEach {
+            it.buffer.close()
+        }
+        tilePool.clear()
+        pageBuffers.clear()
+    }
 }

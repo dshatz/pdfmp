@@ -180,7 +180,7 @@ actual class PdfRenderer: PdfiumRenderer {
     }
 
     override fun PageHandle.closePage() {
-        workerScope.launch {
+        GlobalScope.launch {
             pdfium().ClosePage(this@closePage)
         }
     }
@@ -193,9 +193,19 @@ actual class PdfRenderer: PdfiumRenderer {
     actual override fun close() {
         GlobalScope.launch {
             if (isDocLoaded()) {
+                pageHandleCache.forEach {
+                    it.value.closePage()
+                }
+                pageHandleCache.clear()
                 pdfium().CloseDocument(doc)
+                bufferPool.forEach {
+                    releaseBuffer(it)
+                }
+                bufferPool.clear()
             }
-            sourceBytesPtr?.let(PdfiumWasm::_free)
+            sourceBytesPtr?.let {
+                pdfium().releaseDocumentBytes(Ptr(it))
+            }
         }
     }
 }

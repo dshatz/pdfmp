@@ -11,6 +11,10 @@ actual class ImageBuffer(
     actual override val width: Int = bitmap.width
     actual override val height: Int = bitmap.height
     actual override val stride: Int = bitmap.rowBytes
+
+    override fun close() {
+        bitmap.recycle()
+    }
 }
 
 actual object ImageBufferAdapter: JvmJniAdapter<ImageBuffer, Bitmap> {

@@ -6,6 +6,7 @@ import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorInfo
 import org.jetbrains.skia.ColorType
 import org.jetbrains.skia.Data
+import org.jetbrains.skia.Image
 import org.jetbrains.skia.ImageInfo
 import org.jetbrains.skia.Pixmap
 import org.jetbrains.skia.impl.Managed
@@ -17,6 +18,13 @@ actual data class ImageBuffer(
     actual override val width: Int = pixmap.info.width
     actual override val height: Int = pixmap.info.height
     actual override val stride: Int = pixmap.rowBytes
+    actual override fun close() {
+        pixmap.close()
+    }
+
+    actual override fun reset() {
+
+    }
 }
 
 actual object ImageBufferAdapter: JvmJniAdapter<ImageBuffer, SkBitmapInfo> {
@@ -41,8 +49,8 @@ actual object ImageBufferAdapter: JvmJniAdapter<ImageBuffer, SkBitmapInfo> {
         val pixmap = Pixmap.make(
             ImageInfo(
                 ColorInfo(ColorType.BGRA_8888, ColorAlphaType.PREMUL, null),
-                value.height,
-                value.width
+                value.width,
+                value.height
             ),
             data,
             value.strideBytes
