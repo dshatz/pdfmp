@@ -4,8 +4,6 @@ import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 import com.dshatz.pdfmp.pdfium.DataPointer
 import com.dshatz.pdfmp.pdfium.DocHandle
 import com.dshatz.pdfmp.pdfium.PageHandle
-import com.dshatz.pdfmp.pdfium.PdfClip
-import com.dshatz.pdfmp.pdfium.PdfMatrix
 import com.dshatz.pdfmp.pdfium.Pdfium
 import com.dshatz.pdfmp.pdfium.PdfiumBitmap
 import kotlinx.coroutines.CoroutineDispatcher
@@ -43,7 +41,20 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
         ) ?: error("Failed to create combined bitmap wrapper")
     }
 
-    protected abstract suspend fun <R> ImageBuffer.withFpdfBitmap(block: suspend (bitmap: PdfiumBitmap) -> R)
+    /**
+     * Renders the [tile] of [page] into [buffer] using [com.dshatz.pdfmp.pdfium.PdfiumRenderCore.renderTile], as a
+     * single operation (a single worker call on wasm).
+     */
+    protected abstract suspend fun renderTileInto(buffer: ImageBuffer, page: PageHandle, tile: PdfTile, frameColor: UInt?)
+
+    /**
+     * Renders [page] at [dimensions] into [buffer] using [com.dshatz.pdfmp.pdfium.PdfiumRenderCore.renderPage].
+     * The pdfium bitmap must have the size of [buffer], which can differ from [dimensions].
+     */
+    protected abstract suspend fun renderPageInto(buffer: ImageBuffer, page: PageHandle, dimensions: PageDimensions)
+
+    /** [com.dshatz.pdfmp.pdfium.PdfiumRenderCore.pageRatio] of [page]. */
+    protected abstract suspend fun pageRatio(page: PageHandle): Float
 
     /** How many renders currently use each open page. Only touched on [pdfiumDispatcher]. */
     private val pageUsers = mutableMapOf<Int, Int>()
@@ -90,59 +101,7 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
 //        return (source as? PdfSource.Custom)?.customSourceDescriptor?.sourceAdapter?.getLastError()
     }
 
-    /**
-     * Draws a 1-pixel (or customizable thickness) frame around the perimeter of the bitmap.
-     *
-     * @param color ARGB color format (e.g., 0xFF0000FFu for Blue, 0xFFFF0000u for Red)
-     * @param strokeWidth Border width in pixels
-     */
-    private suspend fun PdfiumBitmap.drawFrame(
-        width: Int,
-        height: Int,
-        color: UInt = 0xFF0000FFu, // Default: Solid Blue
-        strokeWidth: Int = 2
-    ) {
-        // Top border
-        fillRect(1, 1, width, strokeWidth, color)
-        // Bottom border
-        fillRect(1, height - strokeWidth - 1, width, strokeWidth, color)
-        // Left border
-        fillRect(1, 1, strokeWidth, height, color)
-        // Right border
-        fillRect(width - strokeWidth - 1, 1, strokeWidth, height, color)
-    }
-
     abstract override fun close()
-
-    abstract suspend fun PdfiumBitmap.fillRect(
-        left: Int,
-        top: Int,
-        width: Int,
-        height: Int,
-        color: UInt
-    )
-
-    abstract suspend fun PdfiumBitmap.destroy()
-
-    protected abstract suspend fun RenderPageBitmap(
-        bitmap: PdfiumBitmap,
-        page: PageHandle,
-        startX: Int,
-        startY: Int,
-        sizeX: Int,
-        sizeY: Int,
-        rotate: Int,
-        flags: Int
-    )
-
-    protected abstract suspend fun RenderPageBitmapWithMatrix(
-        bitmap: PdfiumBitmap,
-        page: PageHandle,
-        matrix: PdfMatrix,
-        clip: PdfClip,
-        flags: Int
-    )
-
 
     override suspend fun getPageCount(): Int = withContext(pdfiumDispatcher) {
         Pdfium.GetPageCount(doc)
@@ -150,74 +109,19 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
 
     override suspend fun renderTile(tile: PdfTile, buffer: ImageBuffer) {
         withContext(pdfiumDispatcher) {
-            /*block(500)*/
-            buffer.withFpdfBitmap { bitmap ->
-                withPage(tile.key.page) { page ->
-                    val result = runCatching {
-                        val pageW: Float = page.getPageWidth()
-                        val pageH: Float = page.getPageHeight()
-
-                        val bgWidth = (tile.scaledPage.width - tile.key.x).coerceIn(0, PdfTile.WIDTH)
-                        val bgHeight = (tile.scaledPage.height - tile.key.y).coerceIn(0, PdfTile.HEIGHT)
-
-                        bitmap.fillRect(
-                            0,
-                            0,
-                            PdfTile.WIDTH,
-                            PdfTile.HEIGHT,
-                            0x00000000u // transparent black to reset the pixels already in the buffer.
-                        )
-
-                        bitmap.fillRect(
-                            0,
-                            0,
-                            bgWidth,
-                            bgHeight,
-                            0xFFFFFFFFu
-                        )
-                        val matrix = PdfMatrix.Identity
-                            .scale(tile.scaledPage.width / pageW, tile.scaledPage.height / pageH)
-                            .translate(-tile.key.x.toFloat(), -tile.key.y.toFloat())
-
-                        val clip = PdfClip(
-                            0f,
-                            0f,
-                            PdfTile.WIDTH.toFloat(),
-                            PdfTile.HEIGHT.toFloat()
-                        )
-                        RenderPageBitmapWithMatrix(
-                            bitmap,
-                            page,
-                            matrix,
-                            clip,
-                            0
-                        )
-                        if (drawTileFrames) {
-                            bitmap.drawFrame(
-                                PdfTile.WIDTH,
-                                PdfTile.HEIGHT,
-                                color = if (tile.key.page % 2 == 0) 0xFF0000FFu else 0xFFFF0000u
-                            )
-                        }
-                    }
-                    result.getOrThrow()
-                }
+            withPage(tile.key.page) { page ->
+                val frameColor = if (drawTileFrames) {
+                    if (tile.key.page % 2 == 0) 0xFF0000FFu else 0xFFFF0000u
+                } else null
+                renderTileInto(buffer, page, tile, frameColor)
             }
         }
     }
 
-    abstract suspend fun PageHandle.getPageWidth(): Float
-    abstract suspend fun PageHandle.getPageHeight(): Float
-
     override suspend fun getPageRatio(pageIndex: Int): Float = withContext(pdfiumDispatcher) {
         val result = runCatching {
             withPage(pageIndex) { page ->
-                val width = page.getPageWidth()
-                val height = page.getPageHeight()
-                if (width <= 0f || height <= 0f) {
-                    error("Invalid size: $width x $height")
-                }
-                width / height
+                pageRatio(page)
             }
         }.recoverCatching {
             val customSourceError = getLastErrorForCustomSource()
@@ -229,29 +133,8 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
     }
 
     suspend fun render(page: Int, dimensions: PageDimensions, buffer: ImageBuffer) = withContext(pdfiumDispatcher) {
-        buffer.withFpdfBitmap { bitmap ->
-            withPage(page) { pageHandle ->
-                val result = runCatching {
-                    bitmap.fillRect(
-                        0,
-                        0,
-                        dimensions.width,
-                        dimensions.height,
-                        0xFFFFFFFFu
-                    )
-                    RenderPageBitmap(
-                        bitmap,
-                        pageHandle,
-                        0,
-                        0,
-                        dimensions.width,
-                        dimensions.height,
-                        0,
-                        0
-                    )
-                }
-                result.getOrThrow()
-            }
+        withPage(page) { pageHandle ->
+            renderPageInto(buffer, pageHandle, dimensions)
         }
     }
 

@@ -128,9 +128,9 @@ private fun TiledViewport(
             DisposableEffect(tile) {
                 val job = scope.launch {
                     try {
-                        delay(200.milliseconds)
+                        // Short debounce: skip tiles that only pass by while scrolling. Rendering a tile takes ~1ms.
+                        delay(50.milliseconds)
                         val buffer = state.renderTile(tile)
-                        buffer.reset()
                         renderedMap[tile] = buffer
                     } catch (e: CancellationException) {
                         state.freeTile(tile)
@@ -188,11 +188,9 @@ private fun FullPages(
             DisposableEffect(pageIdx) {
                 val job = scope.launch {
                     try {
-                        val buffer = state.renderFullPage(pageIdx)
+                        val prefetch = state.visiblePages.value.none { it.pageIdx == pageIdx }
+                        val buffer = state.renderFullPage(pageIdx, prefetch)
                         currentCoroutineContext().ensureActive()
-                        // The buffer may be reused from another page. Drop its cached image so the new pixels are
-                        // drawn instead of a texture cached for the old contents (same as for tiles).
-                        buffer.reset()
                         w("Replacing buffer with new one! Old buffer: ${renderedMap[pageIdx]}")
                         renderedMap[pageIdx] = buffer
                     } catch (e: CancellationException) {
