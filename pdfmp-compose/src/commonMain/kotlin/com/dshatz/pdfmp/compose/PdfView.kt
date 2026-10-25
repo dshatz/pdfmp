@@ -3,7 +3,6 @@ package com.dshatz.pdfmp.compose
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -13,8 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -30,9 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -117,29 +114,6 @@ private fun LazyListScope.fullDocumentBoxes(state: PdfState) {
 }
 
 @Composable
-private fun BoxScope.PdfTileItem(
-    tile: PdfTile,
-    buffer: ImageBuffer?,
-    pageOffsetY: Float
-) {
-    Box(
-        modifier = Modifier
-            .matchParentSize()
-            .graphicsLayer {
-                translationX = tile.key.x.toFloat()
-                translationY = tile.key.y.toFloat() + pageOffsetY
-            }
-            .drawBehind {
-                if (buffer != null) {
-                    drawContext.drawPixmap(
-                        buffer,
-                    )
-                }
-            }
-    )
-}
-
-@Composable
 private fun TiledViewport(
     state: PdfState,
     modifier: Modifier = Modifier
@@ -176,38 +150,26 @@ private fun TiledViewport(
     }
     val display by state.layoutInfo()
     display?.let { currentDisplay ->
-        Box(
+        // A single node draws every tile. Offsets are read in the draw phase, so scrolling only redraws:
+        // no recomposition, no layer per tile and no per-tile nodes to hit-test.
+        Spacer(
             modifier = modifier
                 .clipToBounds()
-                .graphicsLayer {
-                    translationX = -currentDisplay.offsetX
-                    translationY = -currentDisplay.offsetY
+                .drawBehind {
+                    translate(-currentDisplay.offsetX, -currentDisplay.offsetY) {
+                        for (tile in tiles) {
+                            val buffer = renderedMap[tile] ?: continue
+                            drawContext.drawPixmap(
+                                buffer,
+                                dstOffset = Offset(
+                                    tile.key.x.toFloat(),
+                                    tile.key.y + currentDisplay.currentPageOffsetY(tile.key.page)
+                                ),
+                            )
+                        }
+                    }
                 }
-        ) {
-            tiles.forEach { tile ->
-                val buffer = renderedMap[tile]
-                val pageOffsetYState = currentDisplay.pageOffsetY(tile.key.page)
-
-                key(tile) {
-                    PdfTileItem(
-                        tile = tile,
-                        buffer = buffer,
-                        pageOffsetY = pageOffsetYState.value
-                    )
-                }
-            }
-
-            Text(
-                "Tiles: ${renderedMap.size}",
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .graphicsLayer {
-                        translationX = currentDisplay.offsetX
-                        translationY = currentDisplay.offsetY
-                    },
-                style = MaterialTheme.typography.headlineMedium
-            )
-        }
+        )
     }
 }
 
@@ -220,30 +182,31 @@ private fun FullPages(
     val renderedMap = remember { mutableStateMapOf<Int, ImageBuffer>() }
     val visiblePages by state.visiblePages
     val scope = rememberCoroutineScope()
-    for (page in visiblePages) {
-        key(page.pageIdx) {
-            DisposableEffect(page.pageIdx) {
+    val pagesToRender by state.pagesToRender
+    for (pageIdx in pagesToRender) {
+        key(pageIdx) {
+            DisposableEffect(pageIdx) {
                 val job = scope.launch {
                     try {
-                        val buffer = state.renderFullPage(page.pageIdx)
+                        val buffer = state.renderFullPage(pageIdx)
                         currentCoroutineContext().ensureActive()
                         // The buffer may be reused from another page. Drop its cached image so the new pixels are
                         // drawn instead of a texture cached for the old contents (same as for tiles).
                         buffer.reset()
-                        w("Replacing buffer with new one! Old buffer: ${renderedMap[page.pageIdx]}")
-                        renderedMap[page.pageIdx] = buffer
+                        w("Replacing buffer with new one! Old buffer: ${renderedMap[pageIdx]}")
+                        renderedMap[pageIdx] = buffer
                     } catch (e: CancellationException) {
-                        state.freePage(page.pageIdx)
+                        state.freePage(pageIdx)
                         throw e
                     } catch (e: Exception) {
-                        state.freePage(page.pageIdx)
+                        state.freePage(pageIdx)
                         e.printStackTrace()
                     }
                 }
                 onDispose {
                     job.cancel()
-                    renderedMap.remove(page.pageIdx)
-                    state.freePage(page.pageIdx)
+                    renderedMap.remove(pageIdx)
+                    state.freePage(pageIdx)
                 }
             }
         }
@@ -255,37 +218,32 @@ private fun FullPages(
     }
     val display by state.layoutInfo()
     display?.let { currentDisplay ->
-        Box(
+        // Like the tiles: one node, offsets and scale read in the draw phase.
+        Spacer(
             modifier = modifier
                 .clipToBounds()
-                .graphicsLayer {
-                    translationX = -currentDisplay.offsetX
-                    translationY = -currentDisplay.offsetY
-                }
-        ) {
-            visiblePageIndices.forEach { page ->
-                key(page) {
-                    val buffer = renderedMap[page]
-                    val pageOffset = currentDisplay.pageOffsetY(page).value
-                    Box(
-                        modifier = Modifier
-                            .graphicsLayer {
-                                translationY = pageOffset
-                                scaleX = state.scale.value
-                                scaleY = state.scale.value
-                            }
-                            .drawBehind {
-                                if (buffer != null) {
-                                    // The buffer is rendered at FULL_PAGE_RESOLUTION; stretch it to the page size.
-                                    drawContext.drawPixmap(
-                                        buffer = buffer,
-                                        dstSize = state.fullPageSize(page),
-                                    )
+                .drawBehind {
+                    translate(-currentDisplay.offsetX, -currentDisplay.offsetY) {
+                        for (page in visiblePageIndices) {
+                            val buffer = renderedMap[page]
+                            translate(top = currentDisplay.currentPageOffsetY(page)) {
+                                scale(state.scale.value, pivot = Offset.Zero) {
+                                    val pageSize = state.fullPageSize(page)
+                                    if (buffer == null) {
+                                        // Not rendered yet: show a blank page instead of the background.
+                                        drawRect(Color.White, size = pageSize.toSize())
+                                    } else {
+                                        // The buffer is rendered at FULL_PAGE_RESOLUTION; stretch it to the page size.
+                                        drawContext.drawPixmap(
+                                            buffer = buffer,
+                                            dstSize = pageSize,
+                                        )
+                                    }
                                 }
                             }
-                    )
+                        }
+                    }
                 }
-            }
-        }
+        )
     }
 }
