@@ -70,13 +70,51 @@ class PdfiumWebWorker: IPdfium by Pdfium {
     }
 
 
+    // Coarse operations: a whole render is one message, instead of one per pdfium call.
+
+    /** [PdfiumRenderCore.renderTile] into a new [tileWidth] x [tileHeight] bitmap; returns its pixels. */
+    @TransferOwnership
+    fun renderTile(
+        page: PageHandle,
+        x: Int,
+        y: Int,
+        tileWidth: Int,
+        tileHeight: Int,
+        scaledPageWidth: Int,
+        scaledPageHeight: Int,
+        frameColor: UInt?,
+    ): ArrayBuffer = renderToBuffer(tileWidth, tileHeight) { bitmap ->
+        PdfiumRenderCore.renderTile(
+            this, bitmap, page, x, y, tileWidth, tileHeight, scaledPageWidth, scaledPageHeight, frameColor
+        )
+    }
+
     /**
-     * Copies the bitmap pixels out of pdfium memory into a fresh buffer that is transferred to the caller.
-     * No buffer is kept around on either side; the caller's copy is garbage collected once consumed.
+     * [PdfiumRenderCore.renderPage] at [width] x [height] into a new [bitmapWidth] x [bitmapHeight] bitmap; returns
+     * its pixels. The bitmap matches the caller's buffer, whose size can differ from the page size.
      */
     @TransferOwnership
-    fun bitmapAsArrayBuffer(bitmap: PdfiumBitmap): ArrayBuffer {
-        return copyOutOfPdfium(bitmap.memoryPtr.ptr, bitmap.bytes)
+    fun renderPage(page: PageHandle, bitmapWidth: Int, bitmapHeight: Int, width: Int, height: Int): ArrayBuffer =
+        renderToBuffer(bitmapWidth, bitmapHeight) { bitmap ->
+            PdfiumRenderCore.renderPage(this, bitmap, page, width, height)
+        }
+
+    fun pageRatio(page: PageHandle): Float = PdfiumRenderCore.pageRatio(this, page)
+
+    /**
+     * Runs [block] on a temporary bitmap and copies its pixels into a fresh buffer that is transferred to the caller.
+     * Everything happens within one call, so the bitmap is always destroyed, even if the caller was cancelled.
+     */
+    @JSWorkerIgnore
+    private fun renderToBuffer(width: Int, height: Int, block: (PdfiumBitmap) -> Unit): ArrayBuffer {
+        val bitmap = BitmapCreateExBGRA(DataPointer(0u), width, height, width * 4)
+            ?: error("Could not create Pdfium bitmap")
+        try {
+            block(bitmap)
+            return copyOutOfPdfium(bitmap.memoryPtr.ptr, bitmap.bytes)
+        } finally {
+            BitmapDestroy(bitmap)
+        }
     }
 }
 

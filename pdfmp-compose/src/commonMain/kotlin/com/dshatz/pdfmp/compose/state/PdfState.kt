@@ -36,6 +36,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -43,6 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.time.ExperimentalTime
@@ -469,20 +471,31 @@ data class PdfState(
     }
 
     internal suspend fun renderTile(tile: PdfTile): ImageBuffer {
-        if (tile.key.page !in pageRatios) {
-            pageRatios[tile.key.page] = renderer!!.getPageRatio(tile.key.page)
+        pendingTileRenders.update { it + 1 }
+        try {
+            if (tile.key.page !in pageRatios) {
+                pageRatios[tile.key.page] = renderer!!.getPageRatio(tile.key.page)
+            }
+            // Placeholders of visible pages first: the worker handles requests in order, so a page render queued
+            // behind dozens of tile renders would leave the page blank for a long time.
+            pendingFullPageRenders.first { it == 0 }
+            val (buffer, needsRender) = bufferPool.getBufferTile(tile)
+            if (needsRender) {
+                measureTime {
+                    renderer!!.renderTile(tile, buffer)
+                }.also { d("Tile rendered in ${it.absoluteValue}: $tile") }
+                // New pixels: drop the cached image so they get uploaded. Only here, so a tile that is still
+                // rendered (e.g. when scrolling back) keeps its texture instead of being uploaded again.
+                buffer.reset()
+            }
+            return buffer
+        } finally {
+            pendingTileRenders.update { it - 1 }
         }
-        // Placeholders first: the worker handles requests in order, so a page render queued behind dozens of
-        // tile renders would leave the page blank for a long time.
-        pendingFullPageRenders.first { it == 0 }
-        val (buffer, needsRender) = bufferPool.getBufferTile(tile)
-        if (needsRender) {
-            measureTime {
-                renderer!!.renderTile(tile, buffer)
-            }.also { d("Tile rendered in ${it.absoluteValue}: $tile") }
-        }
-        return buffer
     }
+
+    /** Tile renders started and not finished yet. Prefetched full pages wait until this is 0. */
+    private val pendingTileRenders = MutableStateFlow(0)
 
     internal fun freeTile(tile: PdfTile) {
         bufferPool.freeTileBuffer(tile)
@@ -498,7 +511,7 @@ data class PdfState(
      */
     private val fullPageRenderMutex = Mutex()
 
-    /** Full-page renders running or waiting for [fullPageRenderMutex]. Tile renders wait until this is 0. */
+    /** Visible full-page renders running or waiting for [fullPageRenderMutex]. Tile renders wait until this is 0. */
     private val pendingFullPageRenders = MutableStateFlow(0)
 
     /** On-screen size of a full page at scale 1. The page buffer itself is [FULL_PAGE_RESOLUTION] times smaller. */
@@ -509,7 +522,17 @@ data class PdfState(
         return IntSize(pageWidth.toInt(), (pageWidth / ratio).toInt())
     }
 
-    internal suspend fun renderFullPage(page: Int): ImageBuffer {
+    /**
+     * Renders the full-page placeholder of [page]. Visible pages go before tiles. A [prefetch] (a page next to the
+     * visible ones) is only needed later, so it waits for the visible tiles instead.
+     */
+    internal suspend fun renderFullPage(page: Int, prefetch: Boolean): ImageBuffer {
+        if (prefetch) {
+            // Longer than the tile debounce, so the visible tiles have started by the time we check.
+            delay(PREFETCH_DELAY)
+            pendingTileRenders.first { it == 0 }
+            return renderFullPageInOrder(page)
+        }
         pendingFullPageRenders.update { it + 1 }
         try {
             return renderFullPageInOrder(page)
@@ -537,6 +560,9 @@ data class PdfState(
                     pageDimensions,
                     buffer
                 )
+                // The buffer may have held another page: drop its cached image so the new pixels are drawn instead
+                // of a texture cached for the old contents. Only after a render, so unchanged pages aren't re-uploaded.
+                buffer.reset()
             }
             buffer
         }
@@ -643,5 +669,8 @@ data class VisiblePageInfo(
      */
     val visibilityPercentageW = (scaledWidth - leftCutoff - rightCutoff) / scaledWidth
 }
+/** How long a prefetched full page waits before rendering, see [PdfState.renderFullPage]. */
+private val PREFETCH_DELAY = 300.milliseconds
+
 /** Resolution of full-page placeholders relative to their on-screen size (0.5 = half width and height). */
 internal const val FULL_PAGE_RESOLUTION = 0.5f

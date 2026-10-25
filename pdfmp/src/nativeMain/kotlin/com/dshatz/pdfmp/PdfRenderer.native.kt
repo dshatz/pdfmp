@@ -9,10 +9,9 @@ import com.dshatz.pdfmp.pdfium.DataPointer
 import com.dshatz.pdfmp.pdfium.DocHandle
 import com.dshatz.pdfmp.pdfium.FileAccess
 import com.dshatz.pdfmp.pdfium.PageHandle
-import com.dshatz.pdfmp.pdfium.PdfClip
-import com.dshatz.pdfmp.pdfium.PdfMatrix
 import com.dshatz.pdfmp.pdfium.Pdfium
 import com.dshatz.pdfmp.pdfium.PdfiumBitmap
+import com.dshatz.pdfmp.pdfium.PdfiumRenderCore
 import com.dshatz.pdfmp.pdfium.close
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
@@ -22,7 +21,6 @@ import kotlinx.cinterop.StableRef
 import kotlinx.cinterop.UnsafeNumber
 import kotlinx.cinterop.pin
 import kotlinx.cinterop.toLong
-import kotlinx.coroutines.runBlocking
 
 
 @OptIn(ExperimentalForeignApi::class)
@@ -97,16 +95,15 @@ actual class PdfRenderer: PdfiumRenderer {
         }
     }
 
-    override suspend fun <R> ImageBuffer.withFpdfBitmap(block: suspend (bitmap: PdfiumBitmap) -> R) {
+    /** Wraps [this] buffer's memory in a pdfium bitmap, so pdfium renders straight into it. */
+    private fun ImageBuffer.withFpdfBitmap(block: (bitmap: PdfiumBitmap) -> Unit) {
         try {
             (this as WritableImageBuffer).withWritableAddress {
                 val bitmap = fpdfBitmap(it.toLong())
-                runBlocking {
-                    try {
-                        block(bitmap)
-                    } finally {
-                        bitmap.destroy()
-                    }
+                try {
+                    block(bitmap)
+                } finally {
+                    Pdfium.BitmapDestroy(bitmap)
                 }
             }
         } finally {
@@ -114,53 +111,37 @@ actual class PdfRenderer: PdfiumRenderer {
         }
     }
 
+    override suspend fun renderTileInto(buffer: ImageBuffer, page: PageHandle, tile: PdfTile, frameColor: UInt?) {
+        buffer.withFpdfBitmap { bitmap ->
+            PdfiumRenderCore.renderTile(
+                Pdfium,
+                bitmap,
+                page,
+                tile.key.x,
+                tile.key.y,
+                PdfTile.WIDTH,
+                PdfTile.HEIGHT,
+                tile.scaledPage.width,
+                tile.scaledPage.height,
+                frameColor
+            )
+        }
+    }
+
+    override suspend fun renderPageInto(buffer: ImageBuffer, page: PageHandle, dimensions: PageDimensions) {
+        buffer.withFpdfBitmap { bitmap ->
+            PdfiumRenderCore.renderPage(Pdfium, bitmap, page, dimensions.width, dimensions.height)
+        }
+    }
+
+    override suspend fun pageRatio(page: PageHandle): Float = PdfiumRenderCore.pageRatio(Pdfium, page)
+
     override suspend fun DocHandle.openPage(pageIndex: Int): PageHandle? {
         return Pdfium.LoadPage(doc, pageIndex)
     }
 
     override fun PageHandle.closePage() {
         Pdfium.ClosePage(this)
-    }
-
-    override suspend fun PdfiumBitmap.fillRect(left: Int, top: Int, width: Int, height: Int, color: UInt) {
-        Pdfium.BitmapFillRect(this, left, top, width, height, color)
-    }
-
-    override suspend fun PdfiumBitmap.destroy() {
-        Pdfium.BitmapDestroy(this)
-    }
-
-    override suspend fun RenderPageBitmap(
-        bitmap: PdfiumBitmap,
-        page: PageHandle,
-        startX: Int,
-        startY: Int,
-        sizeX: Int,
-        sizeY: Int,
-        rotate: Int,
-        flags: Int
-    ) {
-        Pdfium.RenderPageBitmap(
-            bitmap,
-            page,
-            startX,
-            startY,
-            sizeX,
-            sizeY,
-            rotate,
-            flags
-        )
-
-    }
-
-    override suspend fun RenderPageBitmapWithMatrix(
-        bitmap: PdfiumBitmap,
-        page: PageHandle,
-        matrix: PdfMatrix,
-        clip: PdfClip,
-        flags: Int
-    ) {
-        Pdfium.RenderPageBitmapWithMatrix(bitmap, page, matrix, clip, flags)
     }
 
     /**
@@ -183,13 +164,5 @@ actual class PdfRenderer: PdfiumRenderer {
         }.onFailure {
             e("Could not close document", it)
         }
-    }
-
-    override suspend fun PageHandle.getPageWidth(): Float {
-        return Pdfium.GetPageWidthF(this)
-    }
-
-    override suspend fun PageHandle.getPageHeight(): Float {
-        return Pdfium.GetPageHeightF(this)
     }
 }
