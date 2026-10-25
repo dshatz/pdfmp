@@ -36,6 +36,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -208,6 +211,16 @@ data class PdfState(
 
     internal val visiblePages: State<List<VisiblePageInfo>> = derivedStateOf<List<VisiblePageInfo>> {
         calculateVisiblePages()
+    }
+
+    /**
+     * Pages whose full-page placeholder should be rendered: the visible ones first, then one page before and after,
+     * so a placeholder is usually ready by the time its page scrolls into view.
+     */
+    internal val pagesToRender: State<List<Int>> = derivedStateOf {
+        val visible = visiblePages.value.map { it.pageIdx }
+        if (visible.isEmpty()) return@derivedStateOf visible
+        visible + listOf(visible.first() - 1, visible.last() + 1).filter { it !in visible && it in pages }
     }
 
     internal fun scaledPageWidth(viewport: MutableState<Size>, scale: State<Float>): Float {
@@ -459,6 +472,9 @@ data class PdfState(
         if (tile.key.page !in pageRatios) {
             pageRatios[tile.key.page] = renderer!!.getPageRatio(tile.key.page)
         }
+        // Placeholders first: the worker handles requests in order, so a page render queued behind dozens of
+        // tile renders would leave the page blank for a long time.
+        pendingFullPageRenders.first { it == 0 }
         val (buffer, needsRender) = bufferPool.getBufferTile(tile)
         if (needsRender) {
             measureTime {
@@ -482,13 +498,27 @@ data class PdfState(
      */
     private val fullPageRenderMutex = Mutex()
 
+    /** Full-page renders running or waiting for [fullPageRenderMutex]. Tile renders wait until this is 0. */
+    private val pendingFullPageRenders = MutableStateFlow(0)
+
     /** On-screen size of a full page at scale 1. The page buffer itself is [FULL_PAGE_RESOLUTION] times smaller. */
     internal fun fullPageSize(page: Int): IntSize {
         val pageWidth = viewport.value.width
-        return IntSize(pageWidth.toInt(), (pageWidth / pageRatios[page]!!).toInt())
+        // Same fallback as scaledPageHeight while the page's aspect ratio is not loaded yet.
+        val ratio = pageRatios[page] ?: pageRatios.firstNotNullOfOrNull { it.value } ?: 1f
+        return IntSize(pageWidth.toInt(), (pageWidth / ratio).toInt())
     }
 
     internal suspend fun renderFullPage(page: Int): ImageBuffer {
+        pendingFullPageRenders.update { it + 1 }
+        try {
+            return renderFullPageInOrder(page)
+        } finally {
+            pendingFullPageRenders.update { it - 1 }
+        }
+    }
+
+    private suspend fun renderFullPageInOrder(page: Int): ImageBuffer {
         if (page !in pageRatios) pageRatios[page] = renderer!!.getPageRatio(page)
 
         return fullPageRenderMutex.withLock {

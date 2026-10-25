@@ -43,6 +43,9 @@ class PdfLayoutInfo internal constructor(
         getPageOffsetY(idx)
     }
 
+    /** Current offset of the page, for reading in the layout or draw phase without allocating a derived state. */
+    internal fun currentPageOffsetY(idx: Int): Float = getPageOffsetY(idx)
+
     /**
      * Scroll offset in pixels from the top of the document to the top of the current viewport.
      */
