@@ -29,9 +29,11 @@ class WasmAssetPlugin : Plugin<Project> {
         val copyWasmResources = project.tasks.register<Copy>("copyWasmResources", Copy::class.java) {
             val compilation = kotlin.targets.getByName("wasmJs").compilations.getByName("main")
             val runtimeClasspath = compilation.compileDependencyFiles
+            // The map below turns the classpath into plain files, which drops the tasks that build them
+            // (e.g. :pdfium:compileKotlinWasmJs). Depend on the classpath itself so Gradle runs those first.
+            it.dependsOn(runtimeClasspath)
 
             it.from(runtimeClasspath.map { file ->
-                println("Dependency ${file.path}")
                 if (file.extension == "klib" || file.extension == "jar") {
                     project.zipTree(file)
                 } else {
