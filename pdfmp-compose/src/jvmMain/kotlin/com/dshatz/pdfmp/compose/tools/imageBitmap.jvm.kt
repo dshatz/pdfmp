@@ -7,7 +7,6 @@ import androidx.compose.ui.graphics.drawscope.DrawContext
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.IntSize
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
-import org.jetbrains.skia.Image
 import org.jetbrains.skia.Paint
 
 actual fun DrawContext.drawPixmap(
@@ -15,9 +14,8 @@ actual fun DrawContext.drawPixmap(
     dstOffset: Offset,
     dstSize: IntSize,
 ) {
-    val img = Image.makeFromPixmap(buffer.pixmap)
     canvas.nativeCanvas.drawImageRect(
-        img,
+        buffer.image,
         dst = org.jetbrains.skia.Rect(dstOffset.x, dstOffset.y, dstOffset.x + dstSize.width, dstOffset.y + dstSize.height),
         jvmPaint
     )

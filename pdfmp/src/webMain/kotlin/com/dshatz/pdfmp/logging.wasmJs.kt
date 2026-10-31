@@ -1,7 +1,7 @@
 package com.dshatz.pdfmp
 
 actual fun isDebug(): Boolean {
-    return false
+    return true
 }
 
 internal actual fun logPlatform(

@@ -17,11 +17,14 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -50,9 +53,11 @@ import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 import com.dshatz.pdfmp.w
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -120,52 +125,94 @@ private fun TiledViewport(
 ) {
     val tiles by state.visibleTiles
 
-    val renderedMap = remember { mutableStateMapOf<PdfTile, ImageBuffer>() }
+    // Every rendered tile, of the current scale or not: after a zoom, the old tiles stay until the new ones arrive.
+    val renderedTiles = remember { mutableStateMapOf<PdfTile, RenderedTile>() }
+
+    // Revealed a few per frame: each one is uploaded to the GPU on its first draw.
+    val pendingTiles = remember { mutableStateMapOf<PdfTile, ImageBuffer>() }
+    val revealSignal = remember { Channel<Unit>(Channel.CONFLATED) }
+    LaunchedEffect(Unit) {
+        var order = 0L
+        for (signal in revealSignal) {
+            while (pendingTiles.isNotEmpty()) {
+                withFrameNanos { }
+                pendingTiles.keys.take(MAX_NEW_TILES_PER_FRAME).forEach { tile ->
+                    val buffer = pendingTiles.remove(tile) ?: return@forEach
+                    // Not if tilesToFree freed the tile meanwhile: its buffer may already belong to another tile.
+                    if (state.ownsTileBuffer(tile, buffer)) renderedTiles[tile] = RenderedTile(buffer, order++)
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        snapshotFlow { tilesToFree(renderedTiles.keys, state.visibleTiles.value) }
+            .collect { tiles ->
+                tiles.forEach { tile ->
+                    renderedTiles.remove(tile)
+                    state.freeTile(tile)
+                }
+            }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            (renderedTiles.keys + pendingTiles.keys).forEach { state.freeTile(it) }
+            renderedTiles.clear()
+            pendingTiles.clear()
+        }
+    }
 
     val scope = rememberCoroutineScope() { Dispatchers.Default }
     for (tile in tiles) {
         key(tile) {
             DisposableEffect(tile) {
                 val job = scope.launch {
+                    // Short debounce: skip tiles that only pass by while scrolling. Rendering a tile takes ~1ms.
+                    delay(100.milliseconds)
                     try {
-                        // Short debounce: skip tiles that only pass by while scrolling. Rendering a tile takes ~1ms.
-                        delay(50.milliseconds)
                         val buffer = state.renderTile(tile)
-                        renderedMap[tile] = buffer
+                        if (scope.isActive) {
+                            // Revealed even if this tile was disposed meanwhile: tilesToFree then frees it.
+                            pendingTiles[tile] = buffer
+                            revealSignal.trySend(Unit)
+                        } else {
+                            // TiledViewport left composition while rendering: nothing would reveal or free it.
+                            state.freeTile(tile)
+                        }
                     } catch (e: CancellationException) {
-                        state.freeTile(tile)
                         throw e
                     } catch (e: Exception) {
-                        state.freeTile(tile)
                         e.printStackTrace()
                     }
                 }
                 onDispose {
                     job.cancel()
-                    renderedMap.remove(tile)
-                    state.freeTile(tile)
                 }
             }
         }
     }
     val display by state.layoutInfo()
     display?.let { currentDisplay ->
-        // A single node draws every tile. Offsets are read in the draw phase, so scrolling only redraws:
-        // no recomposition, no layer per tile and no per-tile nodes to hit-test.
+        // Read offsets in the draw phase, so scrolling happens on the GPU.
         Spacer(
             modifier = modifier
                 .clipToBounds()
                 .drawBehind {
                     translate(-currentDisplay.offsetX, -currentDisplay.offsetY) {
-                        for (tile in tiles) {
-                            val buffer = renderedMap[tile] ?: continue
-                            drawContext.drawPixmap(
-                                buffer,
-                                dstOffset = Offset(
-                                    tile.key.x.toFloat(),
-                                    tile.key.y + currentDisplay.currentPageOffsetY(tile.key.page)
-                                ),
-                            )
+                        // Oldest first: the tiles of the current scale, rendered last, cover those of previous ones.
+                        val currentScaledPages = tiles.associate { it.key.page to it.scaledPage }
+                        for ((tile, rendered) in renderedTiles.entries.sortedBy { it.value.order }) {
+                            val scaledPage = currentScaledPages[tile.key.page] ?: continue
+                            // 1.0 for tiles of the current scale; stretches those of a previous scale to it.
+                            val factor = scaledPage.width.toFloat() / tile.scaledPage.width
+                            translate(top = currentDisplay.currentPageOffsetY(tile.key.page)) {
+                                scale(factor, pivot = Offset.Zero) {
+                                    drawContext.drawPixmap(
+                                        rendered.buffer,
+                                        dstOffset = Offset(tile.key.x.toFloat(), tile.key.y.toFloat()),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -216,7 +263,6 @@ private fun FullPages(
     }
     val display by state.layoutInfo()
     display?.let { currentDisplay ->
-        // Like the tiles: one node, offsets and scale read in the draw phase.
         Spacer(
             modifier = modifier
                 .clipToBounds()
@@ -245,3 +291,34 @@ private fun FullPages(
         )
     }
 }
+
+/** A rendered tile, see TiledViewport. [order] grows with every revealed tile: higher is newer. */
+private class RenderedTile(val buffer: ImageBuffer, val order: Long)
+
+/**
+ * Tiles outside the current [area] (viewport and prefetch margin) to free: right away if they don't overlap it,
+ * otherwise once the whole area is rendered, so no gap shows the full page in between.
+ */
+private fun tilesToFree(rendered: Set<PdfTile>, area: List<PdfTile>): List<PdfTile> {
+    val areaTiles = area.toSet()
+    val outside = rendered.filter { it !in areaTiles }
+    if (areaTiles.all { it in rendered }) return outside
+    return outside.filterNot { it.overlapsAny(area) }
+}
+
+/** Whether this tile of a previous scale, stretched to the current scale, overlaps any of the [current] tiles. */
+private fun PdfTile.overlapsAny(current: List<PdfTile>): Boolean {
+    val samePage = current.filter { it.key.page == key.page }
+    val scaledPage = samePage.firstOrNull()?.scaledPage ?: return false
+    val factor = scaledPage.width.toFloat() / this.scaledPage.width
+    val left = key.x * factor
+    val top = key.y * factor
+    val right = left + PdfTile.WIDTH * factor
+    val bottom = top + PdfTile.HEIGHT * factor
+    return samePage.any {
+        it.key.x < right && it.key.x + PdfTile.WIDTH > left && it.key.y < bottom && it.key.y + PdfTile.HEIGHT > top
+    }
+}
+
+/** Upper bound of newly rendered tiles revealed per frame (256 KB of texture upload each). */
+private const val MAX_NEW_TILES_PER_FRAME = 8
