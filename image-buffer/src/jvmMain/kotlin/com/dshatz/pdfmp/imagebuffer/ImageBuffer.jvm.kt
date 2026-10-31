@@ -12,18 +12,39 @@ import org.jetbrains.skia.Pixmap
 import org.jetbrains.skia.impl.Managed
 
 @JniAdapter(ImageBufferAdapter::class)
-actual data class ImageBuffer(
+actual class ImageBuffer(
     val pixmap: Pixmap
 ) : IImageBuffer {
     actual override val width: Int = pixmap.info.width
     actual override val height: Int = pixmap.info.height
     actual override val stride: Int = pixmap.rowBytes
+
+    /** Set by [reset] on the render thread; the draw thread then replaces the image. */
+    @Volatile
+    private var imageStale = false
+    private var _image: Image? = null
+
+    /** Cached so the GPU texture is uploaded once per render, not once per frame. Only call from the draw thread. */
+    val image: Image get() {
+        if (imageStale) {
+            imageStale = false
+            _image?.close()
+            _image = null
+        }
+        return _image ?: Image.makeFromPixmap(pixmap).also { _image = it }
+    }
+
     actual override fun close() {
+        _image?.close()
+        _image = null
+        // The Data owns the pixels; the pixmap only points at them.
+        val data = pixmap.buffer
         pixmap.close()
+        data.close()
     }
 
     actual override fun reset() {
-
+        imageStale = true
     }
 }
 

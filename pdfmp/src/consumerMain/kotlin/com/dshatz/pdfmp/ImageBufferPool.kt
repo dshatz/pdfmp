@@ -18,15 +18,16 @@ class ImageBufferPool {
     internal val pageBuffers: LinkedHashMap<Int, PageBuffer> = linkedMapOf()
     internal val freePageBuffers: LinkedHashSet<ImageBuffer> = linkedSetOf()
 
-    internal val tilePool: HashMap<TileKey, TileBuffer> = hashMapOf()
+    /** Keyed by the whole tile, scale included: after a zoom, the old scale's tile may still be displayed. */
+    internal val tilePool: HashMap<PdfTile, ImageBuffer> = hashMapOf()
     internal val freeTileBuffers: LinkedHashSet<ImageBuffer> = linkedSetOf()
 
-    data class TileBuffer(
-        val buffer: ImageBuffer,
-        val renderedPageDimensions: PageDimensions
-    )
+    private val lock = ReentrantLock()
 
-    private val pageBufferLock = ReentrantLock()
+    /** Buffers native code is writing into. Never handed out or closed until the render ends, even if freed. */
+    private val rendering: HashSet<ImageBuffer> = hashSetOf()
+
+    private val closeAfterRender: HashSet<ImageBuffer> = hashSetOf()
 
     /**
      * Set by [close]. Renders still running for the closed document must not allocate into this pool:
@@ -39,7 +40,31 @@ class ImageBufferPool {
         if (closed) throw CancellationException("ImageBufferPool is closed")
     }
 
-    fun getBufferPage(page: Int, dimensions: PageDimensions): Pair<ImageBuffer, Boolean> = pageBufferLock.withLock {
+    suspend inline fun <T> withRendering(buffer: ImageBuffer, block: () -> T): T {
+        beginRender(buffer)
+        try {
+            return block()
+        } finally {
+            endRender(buffer)
+        }
+    }
+
+    @PublishedApi
+    internal fun beginRender(buffer: ImageBuffer) = lock.withLock {
+        rendering += buffer
+    }
+
+    @PublishedApi
+    internal fun endRender(buffer: ImageBuffer) = lock.withLock {
+        rendering -= buffer
+        if (closeAfterRender.remove(buffer)) buffer.close()
+    }
+
+    private fun closeWhenIdle(buffer: ImageBuffer) {
+        if (buffer in rendering) closeAfterRender += buffer else buffer.close()
+    }
+
+    fun getBufferPage(page: Int, dimensions: PageDimensions): Pair<ImageBuffer, Boolean> = lock.withLock {
         checkNotClosed()
         val existing = pageBuffers[page]
         if (existing != null) {
@@ -50,7 +75,9 @@ class ImageBufferPool {
                 return existing.buffer to true
             }
         } else {
-            val reuse = freePageBuffers.firstOrNull { it.width == dimensions.width && it.height == dimensions.height }
+            val reuse = freePageBuffers.firstOrNull {
+                it.width == dimensions.width && it.height == dimensions.height && it !in rendering
+            }
             if (reuse != null) {
                 freePageBuffers.remove(reuse)
                 pageBuffers[page] = PageBuffer(reuse, dimensions)
@@ -59,7 +86,7 @@ class ImageBufferPool {
                 // No free buffer has the right size (e.g. after a resize), so none of them will be reused.
                 // Close them before allocating so their memory can be reused instead of growing the heap
                 // (wasm heaps never shrink).
-                freePageBuffers.forEach { it.close() }
+                freePageBuffers.forEach { closeWhenIdle(it) }
                 freePageBuffers.clear()
                 val newBuffer = ImageBufferUtil.allocate(dimensions.width, dimensions.height)
                 pageBuffers[page] = PageBuffer(newBuffer, dimensions)
@@ -69,54 +96,35 @@ class ImageBufferPool {
         }
     }
 
-    fun freePageBuffer(page: Int) = pageBufferLock.withLock {
+    fun freePageBuffer(page: Int) = lock.withLock {
         val freed = pageBuffers.remove(page)
         freed?.let { freePageBuffers.add(it.buffer) }
         freePageBuffers.trimTo(MAX_FREE_PAGE_BUFFERS)
         printBufferSpace()
     }
 
-    private val tileBufferLock = ReentrantLock()
-
-    fun getBufferTile(tile: PdfTile): Pair<ImageBuffer, Boolean> = tileBufferLock.withLock {
+    fun getBufferTile(tile: PdfTile): Pair<ImageBuffer, Boolean> = lock.withLock {
         checkNotClosed()
-        val (w, h) = PdfTile.WIDTH to PdfTile.HEIGHT
-        val existing = tilePool[tile.key]
-        if (existing != null) {
-            if (existing.renderedPageDimensions == tile.scaledPage) {
-                // Existing tile buffer was already filled by this tile at the same scale.
-                return existing.buffer to false
-            }
-            else {
-                // Existing tile buffer was filled by this tile but at different scale.
-                // So we need to repaint
-                tilePool[tile.key] = TileBuffer(existing.buffer, tile.scaledPage)
-                return existing.buffer to true
-            }
-        }
-        else {
-            val free = freeTileBuffers.firstOrNull()
-            free?.let { freeTileBuffers.remove(it) }
-            val freshBuffer = free ?: ImageBufferUtil.allocate(w, h)
-            tilePool[tile.key] = TileBuffer(freshBuffer, tile.scaledPage)
-            printBufferSpace()
-            return freshBuffer to true
-        }
+        tilePool[tile]?.let { return it to false }
+        val free = freeTileBuffers.firstOrNull { it !in rendering }
+        free?.let { freeTileBuffers.remove(it) }
+        val freshBuffer = free ?: ImageBufferUtil.allocate(PdfTile.WIDTH, PdfTile.HEIGHT)
+        tilePool[tile] = freshBuffer
+        printBufferSpace()
+        return freshBuffer to true
     }
 
-    fun freeTileBuffer(tile: PdfTile) = tileBufferLock.withLock {
-        val used = tilePool[tile.key]
-        used?.let { tileBuffer ->
-            tilePool.remove(tile.key)
-            freeTileBuffers += tileBuffer.buffer
-        }
+    fun tileBuffer(tile: PdfTile): ImageBuffer? = lock.withLock { tilePool[tile] }
+
+    fun freeTileBuffer(tile: PdfTile) = lock.withLock {
+        tilePool.remove(tile)?.let { freeTileBuffers += it }
         freeTileBuffers.trimTo(MAX_FREE_TILE_BUFFERS)
         printBufferSpace()
     }
 
     private fun printBufferSpace() {
         if (!shouldLog(LogLevel.DEBUG)) return
-        val usedSize = tilePool.values.sumOf { it.buffer.height * it.buffer.stride }.bytes
+        val usedSize = tilePool.values.sumOf { it.height * it.stride }.bytes
         val freeSize = freeTileBuffers.sumOf { it.height * it.stride }.bytes
         d("Tile buffers: used = ${usedSize.stringMB}; free = ${freeSize.stringMB}")
 
@@ -125,31 +133,25 @@ class ImageBufferPool {
         d("Page buffers: used = ${usedPageSize.stringMB}; free = ${freePageSize.stringMB}")
     }
 
-    /** Closes the oldest buffers until at most [max] remain. Free buffers are not displayed, so closing them is safe. */
+    /** Closes the oldest buffers until at most [max] remain. */
     private fun LinkedHashSet<ImageBuffer>.trimTo(max: Int) {
         while (size > max) {
             val oldest = first()
             remove(oldest)
-            oldest.close()
+            closeWhenIdle(oldest)
         }
     }
 
-    fun close() = pageBufferLock.withLock {
-        tileBufferLock.withLock {
-            closed = true
-            tilePool.values.forEach {
-                it.buffer.close()
-            }
-            pageBuffers.values.forEach {
-                it.buffer.close()
-            }
-            freeTileBuffers.forEach { it.close() }
-            freePageBuffers.forEach { it.close() }
-            tilePool.clear()
-            pageBuffers.clear()
-            freeTileBuffers.clear()
-            freePageBuffers.clear()
-        }
+    fun close() = lock.withLock {
+        closed = true
+        tilePool.values.forEach { closeWhenIdle(it) }
+        pageBuffers.values.forEach { closeWhenIdle(it.buffer) }
+        freeTileBuffers.forEach { closeWhenIdle(it) }
+        freePageBuffers.forEach { closeWhenIdle(it) }
+        tilePool.clear()
+        pageBuffers.clear()
+        freeTileBuffers.clear()
+        freePageBuffers.clear()
     }
 
     companion object {

@@ -31,6 +31,7 @@ import com.dshatz.pdfmp.d
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -349,24 +350,30 @@ data class PdfState(
 
         val viewportBottom = currentY + viewportHeight
         val viewportRight = currentX + viewportWidth
+        // Tiles around the viewport are rendered ahead, so they are ready when they scroll in or after zooming out.
+        val areaTop = currentY - TILE_PREFETCH_MARGIN
+        val areaBottom = viewportBottom + TILE_PREFETCH_MARGIN
+        val areaLeft = currentX - TILE_PREFETCH_MARGIN_HORIZONTAL
+        val areaRight = viewportRight + TILE_PREFETCH_MARGIN_HORIZONTAL
 
         val verticalSpacing = scaledPageSpacing()
         val visibleTiles = mutableListOf<PdfTile>()
+        val prefetchTiles = mutableListOf<PdfTile>()
         var accumulatedHeight = 0f
 
         for ((i, _) in pages) {
             val pageHeight = scaledPageHeight(i, currentScaledWidth)
             val pageTop = accumulatedHeight
             val pageBottom = pageTop + pageHeight
-            if (pageBottom > currentY && pageTop < viewportBottom) {
+            if (pageBottom > areaTop && pageTop < areaBottom) {
 
                 val topLeft = Offset(
-                    x = currentX.coerceAtLeast(0f),
-                    y = (currentY - pageTop).coerceAtLeast(0f),
+                    x = areaLeft.coerceAtLeast(0f),
+                    y = (areaTop - pageTop).coerceAtLeast(0f),
                 )
                 val bottomRight = Offset(
-                    x = viewportRight.coerceAtMost(currentScaledWidth),
-                    y = (viewportBottom - pageTop).coerceAtMost(pageHeight)
+                    x = areaRight.coerceAtMost(currentScaledWidth),
+                    y = (areaBottom - pageTop).coerceAtMost(pageHeight)
                 )
 
                 val minRow = (topLeft.y / PdfTile.HEIGHT).toInt()
@@ -389,15 +396,20 @@ data class PdfState(
                             ),
                             scaledPage = scaledDimensions
                         )
-                        visibleTiles += tile
+                        val tileTop = pageTop + row * PdfTile.HEIGHT
+                        val tileLeft = col * PdfTile.WIDTH
+                        val onScreen = tileTop < viewportBottom && tileTop + PdfTile.HEIGHT > currentY &&
+                                tileLeft < viewportRight && tileLeft + PdfTile.WIDTH > currentX
+                        if (onScreen) visibleTiles += tile else prefetchTiles += tile
                     }
                 }
             }
 
             accumulatedHeight += pageHeight + verticalSpacing
-            if (accumulatedHeight > currentY + viewportHeight) break
+            if (accumulatedHeight > areaBottom) break
         }
-        return visibleTiles
+        // On-screen tiles first: renders start in this order.
+        return visibleTiles + prefetchTiles
     }
 
     private fun Float.ceilToInt(): Int {
@@ -481,9 +493,15 @@ data class PdfState(
             pendingFullPageRenders.first { it == 0 }
             val (buffer, needsRender) = bufferPool.getBufferTile(tile)
             if (needsRender) {
-                measureTime {
-                    renderer!!.renderTile(tile, buffer)
-                }.also { d("Tile rendered in ${it.absoluteValue}: $tile") }
+                try {
+                    measureTime {
+                        renderToCompletion { bufferPool.withRendering(buffer) { renderer!!.renderTile(tile, buffer) } }
+                    }.also { d("Tile rendered in ${it.absoluteValue}: $tile") }
+                } catch (e: Throwable) {
+                    // A fresh buffer that was never displayed: nothing else would free it.
+                    bufferPool.freeTileBuffer(tile)
+                    throw e
+                }
                 // New pixels: drop the cached image so they get uploaded. Only here, so a tile that is still
                 // rendered (e.g. when scrolling back) keeps its texture instead of being uploaded again.
                 buffer.reset()
@@ -494,12 +512,36 @@ data class PdfState(
         }
     }
 
+    /**
+     * Runs a render to completion even if the caller is cancelled: a cancelled native suspend call returns right away
+     * while native code keeps writing into the buffer.
+     */
+    private suspend fun renderToCompletion(block: suspend () -> Unit) {
+        activeRenders.update { it + 1 }
+        try {
+            // Checked after registering: closing the document sets it before waiting for activeRenders.
+            if (closing) throw CancellationException("Document is closing")
+            withContext(NonCancellable) { block() }
+        } finally {
+            activeRenders.update { it - 1 }
+        }
+    }
+
+    /** The renderer and the buffer pool are only closed once this is 0. */
+    private val activeRenders = MutableStateFlow(0)
+
+    @Volatile
+    private var closing = false
+
     /** Tile renders started and not finished yet. Prefetched full pages wait until this is 0. */
     private val pendingTileRenders = MutableStateFlow(0)
 
     internal fun freeTile(tile: PdfTile) {
         bufferPool.freeTileBuffer(tile)
     }
+
+    /** Whether [buffer] is still the pool's buffer for [tile], i.e. the tile wasn't freed since it was rendered. */
+    internal fun ownsTileBuffer(tile: PdfTile, buffer: ImageBuffer): Boolean = bufferPool.tileBuffer(tile) === buffer
 
     internal fun freePage(page: Int) {
         bufferPool.freePageBuffer(page)
@@ -555,11 +597,15 @@ data class PdfState(
             val (buffer, needsRender) = bufferPool.getBufferPage(page, pageDimensions)
 
             if (needsRender) {
-                renderer!!.render(
-                    page,
-                    pageDimensions,
-                    buffer
-                )
+                renderToCompletion {
+                    bufferPool.withRendering(buffer) {
+                        renderer!!.render(
+                            page,
+                            pageDimensions,
+                            buffer
+                        )
+                    }
+                }
                 // The buffer may have held another page: drop its cached image so the new pixels are drawn instead
                 // of a texture cached for the old contents. Only after a render, so unchanged pages aren't re-uploaded.
                 buffer.reset()
@@ -593,6 +639,7 @@ data class PdfState(
     private var renderer: PdfRenderer? = null
     internal suspend fun openDocument(renderer: PdfRenderer) {
         this.renderer = renderer
+        closing = false
         try {
             runCatching { renderer.openDocument().getOrThrow() }.mapCatching {
                 bufferPool = ImageBufferPool()
@@ -613,6 +660,8 @@ data class PdfState(
             d("Closing renderer")
             isInitialized.value = false
             withContext(NonCancellable) {
+                closing = true
+                activeRenders.first { it == 0 }
                 renderer.close()
                 bufferPool.close()
             }
@@ -669,8 +718,18 @@ data class VisiblePageInfo(
      */
     val visibilityPercentageW = (scaledWidth - leftCutoff - rightCutoff) / scaledWidth
 }
+/** How far above and below the viewport tiles are rendered ahead. */
+private const val TILE_PREFETCH_MARGIN = 2f * PdfTile.HEIGHT
+
+/** How far left and right of the viewport tiles are rendered ahead. Less than vertically: zooming is slower than scrolling. */
+private const val TILE_PREFETCH_MARGIN_HORIZONTAL = 1f * PdfTile.WIDTH
+
 /** How long a prefetched full page waits before rendering, see [PdfState.renderFullPage]. */
 private val PREFETCH_DELAY = 300.milliseconds
 
-/** Resolution of full-page placeholders relative to their on-screen size (0.5 = half width and height). */
-internal const val FULL_PAGE_RESOLUTION = 0.5f
+/**
+ * Resolution of full-page placeholders relative to their on-screen size (0.5 = half the width and height).
+ * Placeholders show only until the tiles covering them arrive; small ones are cheap to render, to keep in memory and
+ * to upload to the GPU when their page scrolls into view.
+ */
+internal const val FULL_PAGE_RESOLUTION = 0.33f
