@@ -6,9 +6,13 @@ import com.dshatz.jsworker.TransferOwnership
 import com.dshatz.pdfmp.Ptr
 import com.dshatz.pdfmp.pdfium.Pdfium.free
 import com.dshatz.pdfmp.writeWasmByte
+import kotlinx.serialization.Serializable
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
 import kotlin.io.encoding.Base64
+
+@Serializable
+data class ProgressiveDocHandle(val id: Int)
 
 @JSWorker("pdfium-wasm.js", "pdfium.js")
 class PdfiumWebWorker: IPdfium by Pdfium {
@@ -67,6 +71,33 @@ class PdfiumWebWorker: IPdfium by Pdfium {
 
     fun releaseDocumentBytes(ptr: Ptr) {
         ptr.free()
+    }
+
+    // Progressive loading of custom sources, see ProgressiveDocument.
+
+    private var nextProgressiveId = 0
+    private val progressiveDocuments = HashMap<Int, ProgressiveDocument>()
+
+    fun openProgressive(length: Int, chunkSize: Int): ProgressiveDocHandle {
+        val handle = ProgressiveDocHandle(nextProgressiveId++)
+        progressiveDocuments[handle.id] = ProgressiveDocument(length, chunkSize)
+        return handle
+    }
+
+    fun addChunks(handle: ProgressiveDocHandle, firstChunk: Int, @TransferOwnership bytes: Int8Array) {
+        progressiveDocuments.getValue(handle.id).addChunks(firstChunk, bytes)
+    }
+
+    fun isDocAvail(handle: ProgressiveDocHandle): Availability = progressiveDocuments.getValue(handle.id).isDocAvail()
+
+    fun isPageAvail(handle: ProgressiveDocHandle, pageIndex: Int): Availability =
+        progressiveDocuments.getValue(handle.id).isPageAvail(pageIndex)
+
+    fun progressiveDocument(handle: ProgressiveDocHandle): DocHandle? =
+        progressiveDocuments.getValue(handle.id).document()
+
+    fun closeProgressive(handle: ProgressiveDocHandle) {
+        progressiveDocuments.remove(handle.id)?.destroy()
     }
 
 

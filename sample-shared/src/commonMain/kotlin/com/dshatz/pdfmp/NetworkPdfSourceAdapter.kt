@@ -7,92 +7,39 @@ import io.ktor.client.plugins.expectSuccess
 import io.ktor.client.request.get
 import io.ktor.client.request.head
 import io.ktor.client.request.header
-import io.ktor.client.statement.readBytes
+import io.ktor.client.statement.readRawBytes
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentLength
 
+/**
+ * Reads a PDF over HTTP with range requests. pdfmp keeps what it read and asks only for what is missing, merging
+ * neighbouring chunks into one read, so every read is a single request with no caching here.
+ */
 class NetworkPdfSourceAdapter(
     private val url: String,
     private val client: HttpClient
 ) : CustomPdfSourceAdapter {
 
-    private val chunkSize = 64 * 1024 // 64KB
-    private val chunkCache = mutableMapOf<Int, ByteArray>()
-
-    private var documentLength: Long? = null
-    private suspend fun fetchLength(): Long {
+    override suspend fun getDocumentLength(): Long {
         val response = client.head(url) {
             expectSuccess = true
         }
-//        documentLength = response.contentLength() ?: error("No content length")
-        return (response.contentLength() ?: error("No content length")).also {
-            documentLength = it
-        }
-    }
-
-    override suspend fun getDocumentLength(): Long {
-        return fetchLength()
-        /*documentLength?.let(callback::onLength) ?: scope.launch {
-            fetchLength()
-            callback.onLength(documentLength!!)
-        }*/
+        return response.contentLength() ?: error("No content length")
     }
 
     override suspend fun readBlock(position: Long, buffer: ByteBuffer): Int {
         val size = buffer.capacity.toInt()
-        val result = ByteArray(size)
-        var bytesCopied = 0
-
-        while (bytesCopied < size) {
-            val currentPos = position + bytesCopied
-            val chunkIndex = (currentPos / chunkSize).toInt()
-            val chunkOffset = (currentPos % chunkSize).toInt()
-
-            val chunkData = getOrFetchChunk(chunkIndex)
-
-            val availableInChunk = chunkSize - chunkOffset
-            val needed = size - bytesCopied
-            val toCopy = minOf(availableInChunk, needed)
-
-            chunkData.copyInto(
-                destination = result,
-                destinationOffset = bytesCopied,
-                startIndex = chunkOffset,
-                endIndex = chunkOffset + toCopy
-            )
-            bytesCopied += toCopy
+        val response = client.get(url) {
+            header(HttpHeaders.Range, "bytes=$position-${position + size - 1}")
         }
-        buffer.write(result)
-        return bytesCopied
+        // A 200 would be the whole file: the server ignored the range.
+        check(response.status == HttpStatusCode.PartialContent) { "Range request failed: ${response.status}" }
+        val bytes = response.readRawBytes()
+        check(bytes.size == size) { "Expected $size bytes at $position, got ${bytes.size}" }
+        buffer.write(bytes)
+        return size
     }
 
-
-    private suspend fun getOrFetchChunk(index: Int): ByteArray {
-        return chunkCache.getOrPut(index) {
-            val start = index.toLong() * chunkSize
-            val end = minOf(start + chunkSize - 1, documentLength!! - 1)
-
-            val response = client.get(url) {
-                header(HttpHeaders.Range, "bytes=$start-$end")
-            }
-
-            if (response.status != HttpStatusCode.PartialContent && response.status != HttpStatusCode.OK) {
-                throw Exception("Range request failed")
-            }
-
-            val bytes = response.readBytes()
-            if (bytes.size < chunkSize && (start + bytes.size) < documentLength!!) {
-                val fullChunk = ByteArray(chunkSize)
-                bytes.copyInto(fullChunk)
-                fullChunk
-            } else {
-                bytes
-            }
-        }
-    }
-
-    override fun close() {
-        chunkCache.clear()
-    }
+    override fun close() {}
 }
