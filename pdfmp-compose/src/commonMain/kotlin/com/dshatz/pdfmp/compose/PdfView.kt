@@ -70,7 +70,7 @@ import kotlin.time.Duration.Companion.milliseconds
 fun PdfView(
     state: PdfState,
     modifier: Modifier = Modifier,
-) {
+) = key(state) {
     val listState = rememberLazyListState()
     val horizontalScroll = rememberScrollState()
 

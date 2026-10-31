@@ -66,8 +66,8 @@ fun rememberPdfState(
     InitLibEffect()
     val scope = rememberCoroutineScope()
     val pageSpacingPx = with(LocalDensity.current) { pageSpacing.toPx().toInt() }
-    val state = remember { PdfState(pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
-    LaunchedEffect(pdfSource) {
+    val state = remember(pdfSource) { PdfState(pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
+    LaunchedEffect(state) {
         val renderer = withContext(Dispatchers.Default) {
             PdfRenderer(pdfSource)
         }
@@ -86,8 +86,8 @@ fun rememberPdfState(
     InitLibEffect()
     val scope = rememberCoroutineScope()
     val pageSpacingPx = with(LocalDensity.current) { pageSpacing.toPx().toInt() }
-    val state = remember { PdfState(pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
-    LaunchedEffect(customPdfSourceAdapter) {
+    val state = remember(customPdfSourceAdapter) { PdfState(pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
+    LaunchedEffect(state) {
         val renderer = withContext(Dispatchers.Default) {
             d("Init with custom source (jvm)")
             PdfRenderer(customPdfSourceAdapter).also {
@@ -640,10 +640,10 @@ data class PdfState(
     internal suspend fun openDocument(renderer: PdfRenderer) {
         this.renderer = renderer
         closing = false
+        // Created first, so finally can close it even if opening is cancelled.
+        bufferPool = ImageBufferPool()
         try {
-            runCatching { renderer.openDocument().getOrThrow() }.mapCatching {
-                bufferPool = ImageBufferPool()
-            }.onFailure {
+            runCatching { renderer.openDocument().getOrThrow() }.onFailure {
                 d("Failed to open document: $it")
                 this@PdfState.error.value = it
             }.onSuccess {
