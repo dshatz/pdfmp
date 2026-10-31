@@ -33,6 +33,12 @@ external object PdfiumWasm {
     fun _FPDF_CloseDocument(document: UInt)
     fun _FPDF_DestroyLibrary()
 
+    fun _FPDFAvail_Create(fileAvail: UInt, fileAccess: UInt): UInt
+    fun _FPDFAvail_Destroy(avail: UInt)
+    fun _FPDFAvail_IsDocAvail(avail: UInt, hints: UInt): Int
+    fun _FPDFAvail_GetDocument(avail: UInt, password: Int?): UInt
+    fun _FPDFAvail_IsPageAvail(avail: UInt, pageIndex: Int, hints: UInt): Int
+
     fun _malloc(size: Int): UInt
     fun _free(ptr: UInt)
 }

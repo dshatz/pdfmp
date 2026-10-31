@@ -309,7 +309,8 @@ private fun NetworkFile() {
             Column(verticalArrangement = Arrangement.Center) {
                 val layout by pdf.layoutInfo()
                 layout?.let {
-                    Text("Page ${it.mostVisiblePage.value?.pageIdx}/${it.totalPages.value}")
+                    val pageIdx = it.mostVisiblePage.value?.pageIdx ?: 0
+                    Text("Page ${pageIdx + 1}/${it.totalPages.value}")
                 }
             }
         }

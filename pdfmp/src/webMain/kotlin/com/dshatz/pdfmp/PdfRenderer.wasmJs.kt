@@ -3,13 +3,17 @@
 package com.dshatz.pdfmp
 
 import com.dshatz.kni.annotations.JniCall
+import com.dshatz.kni.buffers.ByteBuffer
+import com.dshatz.kni.buffers.allocateBuffer
 import com.dshatz.kni.flows.NativeBackedFlow
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 import com.dshatz.pdfmp.imagebuffer.bytes
+import com.dshatz.pdfmp.pdfium.Availability
 import com.dshatz.pdfmp.pdfium.DataPointer
 import com.dshatz.pdfmp.pdfium.DocHandle
 import com.dshatz.pdfmp.pdfium.PageHandle
 import com.dshatz.pdfmp.pdfium.PdfiumWebWorkerWebWorker
+import com.dshatz.pdfmp.pdfium.ProgressiveDocHandle
 import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import com.dshatz.pdfmp.source.PdfSource
 import kotlinx.coroutines.CompletableDeferred
@@ -75,8 +79,29 @@ actual class PdfRenderer: PdfiumRenderer {
                     }
                     is PdfSource.PdfPath -> TODO()
                 }
+            } else if (customSource != null) {
+                openProgressive(customSource)
             }
         }
+    }
+
+    private var progressive: ProgressiveDocHandle? = null
+
+    override suspend fun progressiveOpen(length: Int, chunkSize: Int) {
+        progressive = pdfium().openProgressive(length, chunkSize)
+    }
+
+    override suspend fun progressiveIsDocAvail(): Availability = pdfium().isDocAvail(progressive!!)
+
+    override suspend fun progressiveIsPageAvail(pageIndex: Int): Availability =
+        pdfium().isPageAvail(progressive!!, pageIndex)
+
+    override suspend fun progressiveDocument(): DocHandle? = pdfium().progressiveDocument(progressive!!)
+
+    override suspend fun progressiveFill(firstChunk: Int, size: Int, read: suspend (ByteBuffer) -> Unit) {
+        val buffer = allocateBuffer(size.toLong())
+        read(buffer)
+        pdfium().addChunks(progressive!!, firstChunk, buffer.byteArray.toInt8Array())
     }
 
     @JniCall
@@ -142,6 +167,8 @@ actual class PdfRenderer: PdfiumRenderer {
             sourceBytesPtr?.let {
                 pdfium().releaseDocumentBytes(Ptr(it))
             }
+            progressive?.let { pdfium().closeProgressive(it) }
+            customSource?.close()
             worker.terminate()
         }
     }

@@ -1,13 +1,19 @@
 package com.dshatz.pdfmp
 
+import com.dshatz.kni.buffers.ByteBuffer
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
+import com.dshatz.pdfmp.pdfium.Availability
 import com.dshatz.pdfmp.pdfium.DataPointer
 import com.dshatz.pdfmp.pdfium.DocHandle
 import com.dshatz.pdfmp.pdfium.PageHandle
 import com.dshatz.pdfmp.pdfium.Pdfium
 import com.dshatz.pdfmp.pdfium.PdfiumBitmap
+import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -69,7 +75,7 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
     private suspend fun <T> withPage(pageIndex: Int, block: suspend (PageHandle) -> T): T {
         val page = pageOpenMutex.withLock {
             // Re-insert so pageHandleCache stays ordered from least to most recently used.
-            val handle = pageHandleCache.remove(pageIndex) ?: doc.openPage(pageIndex) ?: error(
+            val handle = pageHandleCache.remove(pageIndex) ?: openPageWhenAvailable(pageIndex) ?: error(
                 "Failed to load page $pageIndex: ${getLastErrorForCustomSource() ?: Pdfium.GetLastError()}"
             )
             pageHandleCache[pageIndex] = handle
@@ -95,6 +101,63 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
 
     protected abstract suspend fun DocHandle.openPage(pageIndex: Int): PageHandle?
     protected abstract fun PageHandle.closePage()
+
+    private suspend fun openPageWhenAvailable(pageIndex: Int): PageHandle? {
+        if (progressiveSource != null) awaitAvailable { progressiveIsPageAvail(pageIndex) }
+        return doc.openPage(pageIndex)
+    }
+
+    // Progressive loading of custom sources, see com.dshatz.pdfmp.pdfium.ProgressiveDocument.
+
+    private var progressiveSource: CustomPdfSourceAdapter? = null
+    private var documentLength = 0L
+
+    /** Opens [source] reading only what pdfium needs: first for the document, then for each page as it opens. */
+    protected suspend fun openProgressive(source: CustomPdfSourceAdapter) = withContext(pdfiumDispatcher) {
+        documentLength = source.getDocumentLength()
+        require(documentLength <= Int.MAX_VALUE) { "Documents over 2 GB are not supported" }
+        progressiveSource = source
+        progressiveOpen(documentLength.toInt(), PROGRESSIVE_CHUNK_SIZE)
+        awaitAvailable { progressiveIsDocAvail() }
+        doc = progressiveDocument() ?: error("FPDFAvail_GetDocument returned null")
+    }
+
+    /** Fetches the chunks [availability] reports missing until it reports the data available. */
+    private suspend fun awaitAvailable(availability: suspend () -> Availability) {
+        while (true) {
+            val result = availability()
+            when (result.status) {
+                Availability.AVAILABLE -> return
+                Availability.NOT_AVAILABLE -> {
+                    check(result.missingChunks.isNotEmpty()) { "pdfium is missing data but asked for none" }
+                    fetchChunks(result.missingChunks)
+                }
+                else -> error("Invalid PDF data")
+            }
+        }
+    }
+
+    /** One read per run of consecutive chunks, all in parallel. */
+    private suspend fun fetchChunks(chunks: List<Int>) = coroutineScope {
+        chunks.consecutiveRuns().map { run -> async { fetchRun(run) } }.awaitAll()
+    }
+
+    private suspend fun fetchRun(chunks: IntRange) {
+        val offset = chunks.first.toLong() * PROGRESSIVE_CHUNK_SIZE
+        val size = minOf((chunks.last - chunks.first + 1).toLong() * PROGRESSIVE_CHUNK_SIZE, documentLength - offset)
+        progressiveFill(chunks.first, size.toInt()) { buffer -> progressiveSource!!.readBlock(offset, buffer) }
+    }
+
+    // Platform side of progressive loading: the com.dshatz.pdfmp.pdfium.ProgressiveDocument calls, in-process or in
+    // the web worker. Called on [pdfiumDispatcher].
+
+    protected abstract suspend fun progressiveOpen(length: Int, chunkSize: Int)
+    protected abstract suspend fun progressiveIsDocAvail(): Availability
+    protected abstract suspend fun progressiveIsPageAvail(pageIndex: Int): Availability
+    protected abstract suspend fun progressiveDocument(): DocHandle?
+
+    /** Lets [read] write [size] bytes starting at chunk [firstChunk], then makes them available to pdfium. */
+    protected abstract suspend fun progressiveFill(firstChunk: Int, size: Int, read: suspend (ByteBuffer) -> Unit)
 
     protected fun getLastErrorForCustomSource(): String? {
         return null // TODO
@@ -139,7 +202,26 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
     }
 
     companion object {
+        /** The smallest unit read from a custom source. */
+        private const val PROGRESSIVE_CHUNK_SIZE = 64 * 1024
+
         /** Unused pages kept open, so scrolling back and forth doesn't reparse pages all the time. */
         private const val MAX_IDLE_OPEN_PAGES = 2
     }
+}
+
+/** Runs of consecutive values of this sorted list, e.g. [1, 2, 3, 7, 8] -> [1..3, 7..8]. */
+private fun List<Int>.consecutiveRuns(): List<IntRange> {
+    val runs = mutableListOf<IntRange>()
+    var start = first()
+    var end = start
+    for (value in drop(1)) {
+        if (value == end + 1) end = value else {
+            runs += start..end
+            start = value
+            end = value
+        }
+    }
+    runs += start..end
+    return runs
 }
