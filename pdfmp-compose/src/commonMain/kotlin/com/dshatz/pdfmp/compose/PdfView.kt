@@ -1,6 +1,5 @@
 package com.dshatz.pdfmp.compose
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,25 +7,22 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.withFrameNanos
-import androidx.compose.runtime.mutableStateSetOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -35,22 +31,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.graphics.layer.GraphicsLayer
-import androidx.compose.ui.graphics.layer.drawLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import com.dshatz.pdfmp.PdfTile
 import com.dshatz.pdfmp.compose.platformModifier.platformScrollableModifier
 import com.dshatz.pdfmp.compose.state.PdfState
-import com.dshatz.pdfmp.compose.tools.bufferColorFilter
 import com.dshatz.pdfmp.compose.tools.drawPixmap
 import com.dshatz.pdfmp.compose.tools.pageTransformModifier
-import com.dshatz.pdfmp.d
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 import com.dshatz.pdfmp.w
 import kotlinx.coroutines.CancellationException
@@ -125,9 +113,7 @@ private fun LazyListScope.fullDocumentBoxes(state: PdfState) {
             val bottomPadding = if (pageIdx != state.pageRange.last) state.scaledPageSpacing() else 0
             Column(Modifier
                 .requiredSize(size)
-                .padding(bottom = with(density) { bottomPadding.toDp() }),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center) {
+                .padding(bottom = with(density) { bottomPadding.toDp() })) {
             }
         }
     }
@@ -209,13 +195,15 @@ private fun TiledViewport(
     val display by state.layoutInfo()
     display?.let { currentDisplay ->
         // Read offsets in the draw phase, so scrolling happens on the GPU.
+        val currentScaledPages = remember(tiles) {
+            tiles.associate { it.key.page to it.scaledPage }
+        }
         Spacer(
             modifier = modifier
                 .clipToBounds()
                 .drawBehind {
                     translate(-currentDisplay.offsetX, -currentDisplay.offsetY) {
                         // Oldest first: the tiles of the current scale, rendered last, cover those of previous ones.
-                        val currentScaledPages = tiles.associate { it.key.page to it.scaledPage }
                         for ((tile, rendered) in renderedTiles.entries.sortedBy { it.value.order }) {
                             val scaledPage = currentScaledPages[tile.key.page] ?: continue
                             // 1.0 for tiles of the current scale; stretches those of a previous scale to it.
@@ -253,7 +241,6 @@ private fun FullPages(
                         val prefetch = state.visiblePages.value.none { it.pageIdx == pageIdx }
                         val buffer = state.renderFullPage(pageIdx, prefetch)
                         currentCoroutineContext().ensureActive()
-                        w("Replacing buffer with new one! Old buffer: ${renderedMap[pageIdx]}")
                         renderedMap[pageIdx] = buffer
                     } catch (e: CancellationException) {
                         state.freePage(pageIdx)
