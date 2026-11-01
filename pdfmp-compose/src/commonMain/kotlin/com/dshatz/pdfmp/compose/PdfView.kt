@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -64,15 +66,28 @@ import kotlin.time.Duration.Companion.milliseconds
 /**
  * Display a PDF document from the given [state].
  *
+ * [contentPadding] adds scrollable space around the pages like in `LazyColumn`, e.g. the navigation bar
+ * height as bottom padding, so the end of the document can scroll above it. Only the top and bottom values
+ * are used; the pages always span the full viewport width.
+ *
  * Please enforce the size using either `Modifier.fillMaxSize` or `Modifier.size`.
  */
 @Composable
 fun PdfView(
     state: PdfState,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues.Zero,
 ) = key(state) {
     val listState = rememberLazyListState()
     val horizontalScroll = rememberScrollState()
+
+    val density = LocalDensity.current
+    val topPaddingPx = with(density) { contentPadding.calculateTopPadding().toPx() }
+    val bottomPaddingPx = with(density) { contentPadding.calculateBottomPadding().toPx() }
+    SideEffect {
+        state.topPadding.floatValue = topPaddingPx
+        state.bottomPadding.floatValue = bottomPaddingPx
+    }
 
     if (state.isInitialized.value) {
         LaunchedEffect(Unit) {

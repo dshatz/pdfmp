@@ -122,8 +122,14 @@ data class PdfState(
      */
     private val renderingX = mutableFloatStateOf(0f)
 
+    /** Extra scrollable space (px) before the first page, set by `PdfView`. */
+    internal val topPadding = mutableFloatStateOf(0f)
+
+    /** Extra scrollable space (px) after the last page, set by `PdfView`. */
+    internal val bottomPadding = mutableFloatStateOf(0f)
+
     private val totalDocumentHeight = derivedStateOf {
-        var height = (pages.size - 1) * scaledPageSpacing().toFloat()
+        var height = (pages.size - 1) * scaledPageSpacing().toFloat() + topPadding.floatValue + bottomPadding.floatValue
         pages.values.forEach {
             height += scaledPageHeight(it.pageIdx)
         }
@@ -189,7 +195,7 @@ data class PdfState(
     private fun pageScrollOffset(pageIdx: Int): Float {
         return pages.values.takeWhile {
             it.pageIdx < pageIdx
-        }.fold(0f) { acc, page ->
+        }.fold(topPadding.floatValue) { acc, page ->
             acc + scaledPageHeight(page.pageIdx) + scaledPageSpacing()
         }
     }
@@ -277,7 +283,7 @@ data class PdfState(
         }
 
         //Account for page spacings
-        totalContentHeight += scaledPageSpacing() * (pages.size - 1)
+        totalContentHeight += scaledPageSpacing() * (pages.size - 1) + topPadding.floatValue + bottomPadding.floatValue
 
         val maxY = (totalContentHeight - viewport.value.height).coerceAtLeast(0f)
 
@@ -303,8 +309,10 @@ data class PdfState(
 
         val scalingRatio = newScale / currentScale
 
+        // The top padding doesn't scale.
+        val top = topPadding.floatValue
         val mouseAbsY = renderingY.floatValue + centroid.y
-        val newRenderingY = (mouseAbsY * scalingRatio) - centroid.y
+        val newRenderingY = ((mouseAbsY - top) * scalingRatio + top) - centroid.y
 
         val mouseAbsX = renderingX.floatValue + centroid.x
         val newRenderingX = if (newScale == 1f) 0f else (mouseAbsX * scalingRatio) - centroid.x
@@ -349,7 +357,7 @@ data class PdfState(
         val verticalSpacing = scaledPageSpacing()
         val visibleTiles = mutableListOf<PdfTile>()
         val prefetchTiles = mutableListOf<PdfTile>()
-        var accumulatedHeight = 0f
+        var accumulatedHeight = topPadding.floatValue
 
         for ((i, _) in pages) {
             val pageHeight = scaledPageHeight(i, currentScaledWidth)
@@ -417,7 +425,7 @@ data class PdfState(
         val verticalSpacing = scaledPageSpacing()
 
         val visiblePages = mutableListOf<VisiblePageInfo>()
-        var accumulatedHeight = 0f
+        var accumulatedHeight = topPadding.floatValue
 
         for ((i, _) in pages) {
             val pageHeight = scaledPageHeight(i, currentScaledWidth)
@@ -453,10 +461,11 @@ data class PdfState(
     }
 
     private fun getPageAndOffsetForAbsoluteY(absY: Float, s: Float): Pair<Int, Int> {
-        var acc = 0f
+        var acc = topPadding.floatValue
         val w = viewport.value.width * s
         val spacing = pageSpacing.toFloat()
 
+        if (absY <= acc) return pages.keys.first() to 0
         for (i in pages.keys) {
             val h = scaledPageHeight(i, w)
             if (acc + h + spacing > absY) {
