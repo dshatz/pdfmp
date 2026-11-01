@@ -8,10 +8,13 @@ actual object InitLib: LibInitializer {
     actual override fun loadLibs() {
         if (!loaded) {
             d("Loading libs!")
-            BundledLibLoader.loadBundledLibrary("pdfium")
-            BundledLibLoader.loadBundledLibrary("pdfmp")
+            overrideLoadLibrary?.invoke("pdfium") ?: BundledLibLoader.loadBundledLibrary("pdfium")
+            overrideLoadLibrary?.invoke("pdfmp") ?: BundledLibLoader.loadBundledLibrary("pdfmp")
             d("Libs loaded!")
             loaded = true
         }
     }
+
+
+    var overrideLoadLibrary: ((name: String) -> Unit)? = null
 }
