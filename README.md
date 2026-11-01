@@ -32,26 +32,24 @@ pdfmp = { module = "com.dshatz.pdfmp:pdfmp-compose", version = "1.0.9" }
 ```
 
 ### Load the pdf
-#### From bytes
+Documents are described by `PdfData`. Anything not entirely in memory or in a local file is read progressively:
+only the parts needed for the pages on screen are read.
+
 ```kotlin
-  val pdf = PdfSource.PdfBytes(byteArray)
+PdfData.bytes(byteArray)                              // in memory
+PdfData.file(Path("/path/to/doc.pdf"))                // local file, read in place (not on the web)
+PdfData.url("https://example.com/doc.pdf")            // HTTP range requests, or a full download if unsupported
+PdfData.uri(Res.getUri("files/doc.pdf"))              // Compose resources, read in place where possible
+PdfData.uri("content://...")                          // Android: e.g. from the system file picker
+PdfData.fromStream(inputStream)                       // JVM and Android
+PdfData.fromBlob(file)                                // web: <input type="file">, drag and drop
+PdfData.randomAccess(mySource)                        // anything else, see PdfRandomAccess
 ```
 
-#### From path
-```kotlin
-val pdf = PdfSource.PdfPath(Path("~/Download/sample.pdf")
-```
-
-#### From Compose Resources
-You can use this helper.
-```kotlin
-val bytes: PdfBytes? by asyncPdfResource { 
-    Res.readBytes("files/doc.pdf")
-}
-```
+On the web, `PdfData.url` needs a server that allows cross-origin requests (CORS).
 
 ### Display the document.
-To create a `PdfState`, you need only an instance of `PdfSource`.
+To create a `PdfState`, you need only a `PdfData`.
 
 Additionally, you can pass some optional parameters:
  - `pageRange: IntRange` - range of pages to include. **Zero-indexed, inclusive range.**
@@ -60,8 +58,8 @@ Additionally, you can pass some optional parameters:
 ```kotlin
 
 @Composable
-fun ShowDoc(state: PdfState) {
-    val state = rememberPdfState(pdf, pageSpacing = 100.dp)
+fun ShowDoc() {
+    val state = rememberPdfState(PdfData.uri(Res.getUri("files/doc.pdf")), pageSpacing = 100.dp)
     PdfView(state, Modifier.fillMaxSize())
 }
 ```
@@ -109,9 +107,14 @@ layoutInfo?.apply {
 ## Features
 | Feature                        | Supported | Notes                                                                                                                           |
 | ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Loading from bytes             | ✅        |                                                                                                                                 |
-| Loading from path              | ✅        | May not work on Android, depending on permissions and path. Please report.                                                      |
-| Loading from compose resources | ❌        | Does not work directly because native code does not have access to it. See above for how to do it.                              |
+| Loading from bytes             | ✅        | `PdfData.bytes`. The whole document stays in memory.                                                                            |
+| Loading from path              | ✅        | `PdfData.file`, read in place. Not on the web.                                                                                  |
+| Loading from compose resources | ✅        | `PdfData.uri(Res.getUri(…))`, read in place where possible (temporary copy for desktop jars and compressed Android assets).     |
+| Loading from URL               | ✅        | `PdfData.url`: downloads only the parts needed (range requests), else the whole file. Needs CORS on the web.                    |
+| Loading from content URI       | ✅        | Android: `PdfData.uri("content://…")`, e.g. from the system file picker.                                                        |
+| Loading from stream            | ✅        | JVM and Android: `PdfData.fromStream`. File streams are read in place, others copied to a temporary file.                       |
+| Loading from browser file      | ✅        | Web: `PdfData.fromBlob`, e.g. from `<input type="file">`. Only the parts needed are read.                                       |
+| Custom sources                 | ✅        | `PdfData.randomAccess` with your own `PdfRandomAccess`. Only the parts needed are read.                                         |
 | Zooming and scrolling          | ✅        | Loading the high-res image is debounced by 100ms. On desktop, horizontal scrolling can only be done with Shift+Vertical scroll. |
 | Filtering pages                | ✅        | Pass page range to rememberPdfState                                                                                             |
 

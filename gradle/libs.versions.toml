@@ -51,6 +51,8 @@ skiko-fresh = { module = "org.jetbrains.skiko:skiko", version = "0.150.2" }
 # Android
 appcompat = { module = "androidx.appcompat:appcompat", version = "1.7.1" }
 activity-compose = { module = "androidx.activity:activity-compose", version = "1.13.0" }
+filekit-dialogs = { module = "io.github.vinceglb:filekit-dialogs-compose", version = "0.17.0" }
+androidx-core = { module = "androidx.core:core", version = "1.19.1" }
 
 coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.10.0" }
 coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version = "1.10.0" }

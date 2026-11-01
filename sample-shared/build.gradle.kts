@@ -63,10 +63,13 @@ kotlin {
             implementation(compose.components.resources)
             implementation(compose.materialIconsExtended)
 
-            implementation(libs.ktor.core)
-            implementation(libs.ktor.cio)
             implementation(libs.jni.buffers)
             implementation(libs.coroutines)
+            implementation(libs.filekit.dialogs)
+        }
+        androidMain.dependencies {
+            // FileProvider, for the "Content URI" demo.
+            implementation(libs.androidx.core)
         }
     }
 }
@@ -74,3 +77,6 @@ kotlin {
 compose.resources {
     packageOfResClass = "com.dshatz.pdfmp.sample"
 }
+// This module has no Compose UI tests in the browser. The check would require `binaries.executable()`, which a
+// library target doesn't need, and it runs even without any wasm test sources.
+tasks.matching { it.name == "checkComposeUiTestConfigurationForWasmJs" }.configureEach { enabled = false }

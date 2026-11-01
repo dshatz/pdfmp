@@ -12,9 +12,12 @@ actual class ImageBuffer(
     actual override val height: Int = bitmap.height
     actual override val stride: Int = bitmap.rowBytes
 
-    override fun close() {
+    actual override fun close() {
         bitmap.recycle()
     }
+
+    // The Bitmap is drawn directly, there is no cached image to drop.
+    actual override fun reset() {}
 }
 
 actual object ImageBufferAdapter: JvmJniAdapter<ImageBuffer, Bitmap> {
