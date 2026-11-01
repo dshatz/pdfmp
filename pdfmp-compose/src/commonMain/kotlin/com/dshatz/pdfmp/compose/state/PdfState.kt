@@ -651,7 +651,14 @@ class PdfState(
     }
 
     internal fun setViewport(size: Size) {
+        val ratio = size.width / viewport.value.width
         viewport.value = size
+        if (!isInitialized.value || ratio == 1f) return
+        // Page heights follow the width, so scale the scroll position like zoomBy does (top padding doesn't scale).
+        val top = topPadding.floatValue
+        renderingY.floatValue = ((renderingY.floatValue - top) * ratio + top).coerceAtLeast(0f)
+        renderingX.floatValue *= ratio
+        updateUiScrollPosition(renderingX.floatValue, renderingY.floatValue, scale.value)
     }
 }
 
