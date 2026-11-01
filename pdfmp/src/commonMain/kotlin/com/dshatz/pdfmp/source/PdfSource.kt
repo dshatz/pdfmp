@@ -6,7 +6,9 @@ import com.dshatz.kni.serialization.JniSerializer
 import com.dshatz.kni.serialization.readLenString
 import com.dshatz.kni.serialization.writeLenString
 import kotlinx.io.Buffer
+import com.dshatz.pdfmp.InternalPdfmpApi
 import kotlinx.io.files.Path
+import kotlinx.io.files.SystemFileSystem
 
 @JniSerializerFor(Path::class)
 object PathSerializer: JniSerializer<Path>("kotlinx.io.files.Path") {
@@ -20,13 +22,20 @@ object PathSerializer: JniSerializer<Path>("kotlinx.io.files.Path") {
     }
 }
 
+@InternalPdfmpApi
 @JniSerializable
 sealed interface PdfSource {
 
     fun dispose()
 
-    data class PdfPath(@JniSerializable(with = PathSerializer::class) val path: Path): PdfSource {
-        override fun dispose() {}
+    /** [deleteOnClose]: a temporary copy, deleted when the document closes. */
+    data class PdfPath(
+        @JniSerializable(with = PathSerializer::class) val path: Path,
+        val deleteOnClose: Boolean = false,
+    ): PdfSource {
+        override fun dispose() {
+            if (deleteOnClose) SystemFileSystem.delete(path, mustExist = false)
+        }
     }
 
     data class PdfBytes(val bytes: ByteArray): PdfSource {

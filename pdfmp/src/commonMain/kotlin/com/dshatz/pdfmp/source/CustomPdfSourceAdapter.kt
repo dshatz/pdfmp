@@ -3,7 +3,9 @@ package com.dshatz.pdfmp.source
 import com.dshatz.kni.annotations.JniCall
 import com.dshatz.kni.annotations.JniCallback
 import com.dshatz.kni.buffers.ByteBuffer
+import com.dshatz.pdfmp.InternalPdfmpApi
 
+@InternalPdfmpApi
 @JniCallback
 interface CustomPdfSourceAdapter: AutoCloseable {
 

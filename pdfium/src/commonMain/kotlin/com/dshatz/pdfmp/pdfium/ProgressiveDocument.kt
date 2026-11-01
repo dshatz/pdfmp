@@ -48,7 +48,7 @@ class ProgressiveChunks(val length: Int, val chunkSize: Int) {
     /** Records that pdfium needs [size] bytes at [offset], unless they arrived. Returns whether they arrived. */
     fun request(offset: Long, size: Long): Boolean {
         if (isAvailable(offset, size)) return true
-        missing.addAll(chunksOf(offset, size))
+        missing.addAll(chunksOf(offset, size).filterNot { received[it] })
         return false
     }
 

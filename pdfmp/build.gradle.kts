@@ -370,6 +370,7 @@ kotlin {
     compilerOptions {
         freeCompilerArgs.addAll("-Xexpect-actual-classes")
         optIn.add("kotlinx.cinterop.ExperimentalForeignApi")
+        optIn.add("com.dshatz.pdfmp.InternalPdfmpApi")
     }
     project.configureTests(this)
 }

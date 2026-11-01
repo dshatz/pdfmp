@@ -24,13 +24,13 @@ import androidx.compose.ui.unit.dp
 import com.dshatz.pdfmp.ImageBufferPool
 import com.dshatz.pdfmp.InitLib
 import com.dshatz.pdfmp.PageDimensions
+import com.dshatz.pdfmp.PdfData
 import com.dshatz.pdfmp.PdfRenderer
 import com.dshatz.pdfmp.PdfTile
 import com.dshatz.pdfmp.TileKey
+import com.dshatz.pdfmp.compose.platformModifier.rememberPlatformContext
 import com.dshatz.pdfmp.d
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
-import com.dshatz.pdfmp.source.CustomPdfSourceAdapter
-import com.dshatz.pdfmp.source.PdfSource
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -57,42 +57,27 @@ fun InitLibEffect() {
     InitLib.init()
 }
 
+/** The state of a [com.dshatz.pdfmp.compose.PdfView] showing [data]. */
 @Composable
 fun rememberPdfState(
-    pdfSource: PdfSource,
+    data: PdfData,
     pageRange: IntRange = 0..Int.MAX_VALUE,
     pageSpacing: Dp = 0.dp
 ): PdfState {
     InitLibEffect()
+    val context = rememberPlatformContext()
     val scope = rememberCoroutineScope()
     val pageSpacingPx = with(LocalDensity.current) { pageSpacing.toPx().toInt() }
-    val state = remember(pdfSource) { PdfState(pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
+    // One state per document: its buffer pool, renderer and render bookkeeping must not outlive the document.
+    val state = remember(data) { PdfState(pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
     LaunchedEffect(state) {
-        val renderer = withContext(Dispatchers.Default) {
-            PdfRenderer(pdfSource)
-        }
-        d("rememberPdfState")
-        state.openDocument(renderer)
-    }
-    return state
-}
-
-@Composable
-fun rememberPdfState(
-    customPdfSourceAdapter: CustomPdfSourceAdapter,
-    pageRange: IntRange = 0..Int.MAX_VALUE,
-    pageSpacing: Dp = 0.dp
-): PdfState {
-    InitLibEffect()
-    val scope = rememberCoroutineScope()
-    val pageSpacingPx = with(LocalDensity.current) { pageSpacing.toPx().toInt() }
-    val state = remember(customPdfSourceAdapter) { PdfState(pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
-    LaunchedEffect(state) {
-        val renderer = withContext(Dispatchers.Default) {
-            d("Init with custom source (jvm)")
-            PdfRenderer(customPdfSourceAdapter).also {
-                d("After init with custom source (jvm)")
-            }
+        val renderer = try {
+            withContext(Dispatchers.Default) { data.createRenderer(context) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            state.failOpening(e)
+            return@LaunchedEffect
         }
         state.openDocument(renderer)
     }
@@ -157,6 +142,11 @@ data class PdfState(
     internal val isInitialized = mutableStateOf(false)
 
     private val error: MutableState<Throwable?> = mutableStateOf(null)
+
+    /** The document could not be opened, before its renderer existed (e.g. the server was unreachable). */
+    internal fun failOpening(e: Throwable) {
+        error.value = e
+    }
 
     private val _displayState = derivedStateOf {
         val error = error.value

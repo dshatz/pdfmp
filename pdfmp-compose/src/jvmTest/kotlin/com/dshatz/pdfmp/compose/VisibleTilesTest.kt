@@ -2,70 +2,51 @@ package com.dshatz.pdfmp.compose
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import com.dshatz.pdfmp.PageDimensions
 import com.dshatz.pdfmp.PdfTile
+import com.dshatz.pdfmp.TileKey
 import de.infix.testBalloon.framework.core.testSuite
-import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
+
+// Pages are 1000x1000 and the viewport 1000 wide: 4 columns of tiles (the 1 column side margin is off the page).
+// Visible tiles also include 2 rows above and below the viewport, after the tiles on screen.
+
+private fun tiles(page: Int, rows: IntRange, size: Int = 1000) = rows.flatMap { row ->
+    (0..3).map { col ->
+        PdfTile(TileKey(page, col * PdfTile.WIDTH, row * PdfTile.HEIGHT), PageDimensions(size, size))
+    }
+}
 
 val VisibleTilesTest by testSuite {
     test("default") {
-        val state = getMockedState()
-        val tiles = state.visibleTiles.value
-        val scaledWidth = state.scaledPageWidth(state.viewport, state.scale)
-        val th = state.scaledPageHeight(0, scaledWidth).toInt()
-        val tw = scaledWidth.toInt()
+        // Viewport 0..1500: all of page 0, the top half of page 1. Prefetch reaches 2012.
+        val tiles = getMockedState().visibleTiles.value
 
-
-        // Page 0 takes 1000 height
-        (0 until th step PdfTile.HEIGHT).forEach { y ->
-            (0 until tw step PdfTile.WIDTH).forEach { x ->
-                tiles shouldContain PdfTile(0, x, y, tw, th).also { println(it) }
-            }
-        }
-
-        // 500 remaining height for page 1
-        (0 until 500 step PdfTile.HEIGHT).forEach { y ->
-            (0 until tw step PdfTile.WIDTH).forEach { x ->
-                tiles shouldContain PdfTile(1, x, y, tw, th).also { println(it) }
-            }
-        }
-        tiles.count { it.page == 0 } shouldBe 4*4
-        tiles.count { it.page == 1 } shouldBe 2*4
+        val onScreen = tiles(0, 0..3) + tiles(1, 0..1)
+        val prefetched = tiles(1, 2..3) + tiles(2, 0..0)
+        tiles.take(onScreen.size).toSet() shouldBe onScreen.toSet()
+        tiles.drop(onScreen.size).toSet() shouldBe prefetched.toSet()
     }
 
     test("scrolled") {
+        // Viewport 500..1500: page 0 from its second row (256 is hidden), page 1 down to 500.
         val state = getMockedState(viewportSize = Size(1000f, 1000f))
-        // Scroll down so page 0 and page 1 are both half visible
         state.onScroll(Offset(0f, -500f))
         val tiles = state.visibleTiles.value
-        val scaledWidth = state.scaledPageWidth(state.viewport, state.scale)
-        val th = state.scaledPageHeight(0, scaledWidth).toInt()
-        val tw = scaledWidth.toInt()
 
-        (256 until 1024 step PdfTile.HEIGHT).forEach { y ->
-            (0 until tw step PdfTile.WIDTH).forEach { x ->
-                tiles shouldContain PdfTile(0, x, y, tw, th).also { println(it) }
-            }
-        }
-        // We scrolled 500 so only the first row of 256 is hidden. The second row is necessary to display the remaining 12px.
-        // Since normally 1000px page has 4 tiles, now it has 3 visible (12px + 256px + 232px)
-        tiles.count { it.page == 0 } shouldBe 4*3
-
-        (0 until 512 step PdfTile.HEIGHT).forEach { y ->
-            (0 until tw step PdfTile.WIDTH).forEach { x ->
-                tiles shouldContain PdfTile(1, x, y, tw, th).also { println(it) }
-            }
-        }
-
-        tiles.count { it.page == 1 } shouldBe 4*2
+        val onScreen = tiles(0, 1..3) + tiles(1, 0..1)
+        val prefetched = tiles(0, 0..0) + tiles(1, 2..3) + tiles(2, 0..0)
+        tiles.take(onScreen.size).toSet() shouldBe onScreen.toSet()
+        tiles.drop(onScreen.size).toSet() shouldBe prefetched.toSet()
     }
 
     test("zoomed") {
         val state = getMockedState(viewportSize = Size(1000f, 1000f))
         state.zoomTowardsCenter(2f)
         val tiles = state.visibleTiles.value
-        // Zoom 2x towards center - means that viewport is now centered on middle of page 0.
-        // Half of it is not visible in each axis (25% on each side)
-        println(tiles)
+        tiles.shouldNotBeEmpty()
+        // Pages are 2000 wide now, so all tiles are of the zoomed page size.
+        tiles.map { it.scaledPage.width }.toSet() shouldBe setOf(2000)
     }
 }

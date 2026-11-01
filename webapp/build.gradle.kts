@@ -7,7 +7,6 @@ plugins {
     alias(libs.plugins.mp)
     alias(libs.plugins.compose)
     alias(libs.plugins.compose.kt)
-//    alias(libs.plugins.wasmplugin)
     alias(libs.plugins.jsworker)
 }
 
