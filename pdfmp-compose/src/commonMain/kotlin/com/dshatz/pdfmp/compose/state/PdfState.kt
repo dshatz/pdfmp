@@ -31,7 +31,6 @@ import com.dshatz.pdfmp.TileKey
 import com.dshatz.pdfmp.compose.platformModifier.rememberPlatformContext
 import com.dshatz.pdfmp.d
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
-import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,15 +44,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.concurrent.Volatile
 import kotlin.math.ceil
 import kotlin.math.min
-import kotlin.time.ExperimentalTime
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.measureTime
 
 
 @Composable
-fun InitLibEffect() {
+internal fun InitLibEffect() {
     InitLib.init()
 }
 
@@ -84,8 +83,7 @@ fun rememberPdfState(
     return state
 }
 
-@OptIn(ExperimentalTime::class)
-data class PdfState(
+class PdfState(
     internal val pageRange: IntRange = 0..Int.MAX_VALUE,
     internal val scale: MutableState<Float> = mutableFloatStateOf(1f),
     internal val viewport: MutableState<Size> = mutableStateOf(Size(1f, 1f)),
@@ -138,8 +136,7 @@ data class PdfState(
 
     private val coercedPageRange by derivedStateOf {
         if (isInitialized.value) {
-            val pageIdxs = pages.map { it.value.pageIdx }
-            pageIdxs.min()..pageIdxs.max()
+            pages.keys.first()..pages.keys.last()
         } else {
             pageRange
         }
@@ -227,9 +224,12 @@ data class PdfState(
     }
 
     internal fun scaledPageHeight(pageIdx: Int, scaledWidth: Float = scaledPageWidth(viewport, scale)): Float {
-        // If aspect ratio is not known yet, fallback to one of the other pages or A4.
-        val aspectRatio = pageRatios[pageIdx] ?: pageRatios.firstNotNullOfOrNull { it.value } ?: 1f
-        return scaledWidth / (aspectRatio)
+        return scaledWidth / pageRatio(pageIdx)
+    }
+
+    /** Aspect ratio of the page. If not known yet, falls back to one of the other pages or 1. */
+    private fun pageRatio(pageIdx: Int): Float {
+        return pageRatios[pageIdx] ?: pageRatios.firstNotNullOfOrNull { it.value } ?: 1f
     }
 
     @Composable
@@ -266,26 +266,12 @@ data class PdfState(
         }
     }
 
-    private val horizontalScrollOffset = mutableStateOf(0)
-
-    internal fun reportHorizontalOffset(offset: Int) {
-        horizontalScrollOffset.value = offset
-    }
-
     internal fun onScroll(delta: Offset): Offset {
         val currentX = renderingX.floatValue
         val currentY = renderingY.floatValue
 
         val maxX = (viewport.value.width * scale.value - viewport.value.width).coerceAtLeast(0f)
-        var totalContentHeight = 0f
-        for (i in pages.keys) {
-            totalContentHeight += scaledPageHeight(i)
-        }
-
-        //Account for page spacings
-        totalContentHeight += scaledPageSpacing() * (pages.size - 1) + topPadding.floatValue + bottomPadding.floatValue
-
-        val maxY = (totalContentHeight - viewport.value.height).coerceAtLeast(0f)
+        val maxY = (totalDocumentHeight.value - viewport.value.height).coerceAtLeast(0f)
 
         val newX = (currentX - delta.x).coerceIn(0f, maxX)
         val newY = (currentY - delta.y).coerceIn(0f, maxY)
@@ -320,7 +306,6 @@ data class PdfState(
         scale.value = newScale
         renderingY.floatValue = newRenderingY.coerceAtLeast(0f)
         renderingX.floatValue = newRenderingX.coerceAtLeast(0f)
-        reportHorizontalOffset(newRenderingX.toInt())
 
         updateUiScrollPosition(newRenderingX.coerceAtLeast(0f), newRenderingY.coerceAtLeast(0f), newScale)
     }
@@ -463,7 +448,7 @@ data class PdfState(
     private fun getPageAndOffsetForAbsoluteY(absY: Float, s: Float): Pair<Int, Int> {
         var acc = topPadding.floatValue
         val w = viewport.value.width * s
-        val spacing = pageSpacing.toFloat()
+        val spacing = scaledPageSpacing(s).toFloat()
 
         if (absY <= acc) return pages.keys.first() to 0
         for (i in pages.keys) {
@@ -477,8 +462,8 @@ data class PdfState(
         return 0 to 0
     }
 
-    internal fun scaledPageSpacing(): Int {
-        return (pageSpacing * scale.value).toInt()
+    internal fun scaledPageSpacing(scale: Float = this.scale.value): Int {
+        return (pageSpacing * scale).toInt()
     }
 
     internal suspend fun renderTile(tile: PdfTile): ImageBuffer {
@@ -558,9 +543,7 @@ data class PdfState(
     /** On-screen size of a full page at scale 1. The page buffer itself is [FULL_PAGE_RESOLUTION] times smaller. */
     internal fun fullPageSize(page: Int): IntSize {
         val pageWidth = viewport.value.width
-        // Same fallback as scaledPageHeight while the page's aspect ratio is not loaded yet.
-        val ratio = pageRatios[page] ?: pageRatios.firstNotNullOfOrNull { it.value } ?: 1f
-        return IntSize(pageWidth.toInt(), (pageWidth / ratio).toInt())
+        return IntSize(pageWidth.toInt(), (pageWidth / pageRatio(page)).toInt())
     }
 
     /**
