@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -102,8 +103,8 @@ private fun demoSections() = listOf(
     DemoSection(
         "Documents", listOf(
             Demo("Full document", "Zoom and scroll controls", Icons.Default.Description) { FullDoc() },
-            Demo("Pages 3–4", "pageRange = 2..3", Icons.Default.ContentCut) {
-                DocumentView(PdfData.uri(Res.getUri(SAMPLE)), pageRange = 2..3)
+            Demo("Pages 3–4", "pageRange = 2..3, with padding", Icons.Default.ContentCut) {
+                DocumentView(PdfData.uri(Res.getUri(SAMPLE)), pageRange = 2..3, contentPadding = PaddingValues(vertical = 40.dp))
             },
             Demo("Landscape", "Wide pages", Icons.Default.Panorama) {
                 DocumentView(PdfData.uri(Res.getUri("files/landscape.pdf")))
@@ -234,7 +235,11 @@ private fun DrawerItem(demo: Demo, selected: Boolean, expanded: Boolean, onClick
 
 /** [data] with a loading indicator, its error if it can't be opened, and the current page. Null while loading. */
 @Composable
-internal fun DocumentView(data: PdfData?, pageRange: IntRange = 0..Int.MAX_VALUE) {
+internal fun DocumentView(
+    data: PdfData?,
+    pageRange: IntRange = 0..Int.MAX_VALUE,
+    contentPadding: PaddingValues = PaddingValues.Zero,
+) {
     if (data == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
@@ -243,7 +248,7 @@ internal fun DocumentView(data: PdfData?, pageRange: IntRange = 0..Int.MAX_VALUE
     val state by pdf.displayState
     val layout by pdf.layoutInfo()
     Box(Modifier.fillMaxSize()) {
-        PdfView(pdf, modifier = Modifier.fillMaxSize())
+        PdfView(pdf, modifier = Modifier.fillMaxSize(), contentPadding = contentPadding)
         when (val current = state) {
             is DisplayState.Initializing -> CircularProgressIndicator(Modifier.align(Alignment.Center))
             is DisplayState.Error -> Text(
