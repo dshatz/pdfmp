@@ -170,6 +170,6 @@ actual object Pdfium: IPdfium {
     }
 
     actual override fun GetLastError(): ULong {
-        return FPDF_GetLastError()
+        return FPDF_GetLastError().convert()
     }
 }
