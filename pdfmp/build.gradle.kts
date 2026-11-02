@@ -3,6 +3,7 @@
 import com.dshatz.jsworker.asWebWorker
 import com.dshatz.kni.bundlesNatives
 import com.dshatz.kni.bundlesPrebuiltNatives
+import com.dshatz.kni.gettingOptional
 import com.dshatz.pdfmp.buildlogic.configureOptional
 import com.dshatz.pdfmp.buildlogic.configureTests
 import com.dshatz.pdfmp.buildlogic.macOsTargets
@@ -326,7 +327,7 @@ kotlin {
             }
         }
 
-        val androidNativeMain by getting {
+        val androidNativeMain by gettingOptional {
             dependencies {
                 api(project(":image-buffer"))
             }
