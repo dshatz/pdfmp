@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.3.20"
-jni = "2.3.0"
+jni = "2.4.0-Beta01"
 jsworker = "0.1.2"
 agp = "9.1.0"
 publish = "0.35.0"
