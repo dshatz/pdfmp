@@ -90,11 +90,11 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(libs.coroutines.test)
-            implementation("io.mockk:mockk:1.14.6")
+            implementation(libs.mockk)
         }
         named("androidDeviceTest").dependencies {
             implementation(libs.test.core)
-            implementation("androidx.test:runner:1.7.0")
+            implementation(libs.androidx.runner)
         }
     }
 }

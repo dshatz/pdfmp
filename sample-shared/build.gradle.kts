@@ -77,6 +77,3 @@ kotlin {
 compose.resources {
     packageOfResClass = "com.dshatz.pdfmp.sample"
 }
-// This module has no Compose UI tests in the browser. The check would require `binaries.executable()`, which a
-// library target doesn't need, and it runs even without any wasm test sources.
-tasks.matching { it.name == "checkComposeUiTestConfigurationForWasmJs" }.configureEach { enabled = false }

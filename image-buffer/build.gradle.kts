@@ -40,9 +40,14 @@ kotlin {
                 group("androidNative") {
                     withAndroidNative()
                 }
-                group("desktopNativeSkiko") {
-                    withMacos()
-                    withLinux()
+                group("skikoNative") {
+                    group("desktopNativeSkiko") {
+                        withMacos()
+                        withLinux()
+                    }
+                    group("ios") {
+                        withIos()
+                    }
                 }
                 group("desktopNative") {
                     withMingw()
@@ -56,8 +61,7 @@ kotlin {
                 group("desktopNative")
                 group("skiko") {
                     withJvm()
-                    withIos()
-                    group("desktopNativeSkiko")
+                    group("skikoNative")
                 }
                 group("web") {
                     withJs()
