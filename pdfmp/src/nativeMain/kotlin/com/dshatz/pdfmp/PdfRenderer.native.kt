@@ -71,11 +71,7 @@ actual class PdfRenderer: PdfiumRenderer {
 
         if (handle == null) {
             val pdfErrorCode = Pdfium.GetLastError().toByte()
-            val customSourceError = getLastErrorForCustomSource()
-            val pdfiumError = PdfiumException.getError(pdfErrorCode) ?: RuntimeException("Failed to open PDF handle")
-            if (customSourceError != null) {
-                throw RuntimeException(customSourceError, cause = pdfiumError)
-            } else throw pdfiumError
+            throw PdfiumException.getError(pdfErrorCode) ?: RuntimeException("Failed to open PDF handle")
         }
 
         return handle

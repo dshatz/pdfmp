@@ -2,13 +2,11 @@
 
 package com.dshatz.pdfmp.pdfium
 
-import com.dshatz.jsworker.JSWorker
 import com.dshatz.jsworker.JSWorkerIgnore
 import com.dshatz.pdfmp.PdfiumWasm
 import com.dshatz.pdfmp.Ptr
 import com.dshatz.pdfmp.setFloat32InWasmMemory
 import com.dshatz.pdfmp.wasmPointer
-import kotlinx.coroutines.await
 import kotlin.js.Promise
 
 @OptIn(ExperimentalWasmJsInterop::class)
@@ -36,7 +34,7 @@ actual object Pdfium: IPdfium {
         val ptr = PdfiumWasm._FPDF_LoadMemDocument(
             data.ptr,
             size,
-            null // todo
+            null // passwords are not supported yet
         ).wasmPointer()
         return ptr?.let(::DocHandle)
     }
@@ -45,15 +43,14 @@ actual object Pdfium: IPdfium {
         path: String,
         password: String?
     ): DocHandle? {
-        val ptr = PdfiumWasm._FPDF_LoadDocument(0u, null) // todo
-        return DocHandle(Ptr(ptr))
+        throw UnsupportedOperationException("Loading from a path is not supported on the web")
     }
 
     actual override fun LoadCustomDocument(
         access: FileAccess,
         password: String?
     ): DocHandle? {
-        TODO("Not yet implemented")
+        throw UnsupportedOperationException("Custom file access is not supported on the web, use progressive loading")
     }
 
     actual override fun GetPageCount(document: DocHandle): Int {

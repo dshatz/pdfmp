@@ -22,7 +22,7 @@ abstract class PdfData internal constructor() {
         /** A document entirely in memory. */
         fun bytes(bytes: ByteArray): PdfData = SourceData(PdfSource.PdfBytes(bytes))
 
-        /** A local file, read in place. Not supported on the web. */
+        /** A local file, read in place. On the web, a URL relative to the page: there is no file system. */
         fun file(path: Path): PdfData = SourceData(PdfSource.PdfPath(path))
 
         /**
@@ -49,7 +49,11 @@ abstract class PdfData internal constructor() {
 }
 
 internal data class SourceData(private val source: PdfSource) : PdfData() {
-    override suspend fun createRenderer(context: PlatformContext) = PdfRenderer(source)
+    override suspend fun createRenderer(context: PlatformContext): PdfRenderer {
+        // On the web, a path is a URL relative to the page.
+        val pathData = (source as? PdfSource.PdfPath)?.let { platformUriData(it.path.toString(), context) }
+        return pathData?.createRenderer(context) ?: PdfRenderer(source)
+    }
 }
 
 internal data class RandomAccessData(private val source: PdfRandomAccess) : PdfData() {
