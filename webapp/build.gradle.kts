@@ -27,9 +27,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":sample-shared"))
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material3)
         }
         wasmJsMain.dependencies {
             implementation(project(":pdfmp"))
@@ -40,5 +40,4 @@ kotlin {
 
 dependencies {
     "wasmJsWorker"(project(":pdfium-wasm"))
-//    add("wasmJsWorker", )
 }
