@@ -104,6 +104,14 @@ layoutInfo?.apply {
 }
 ```
 
+To build your own gestures or controls (e.g. drag to pan, zoom buttons around a point), `PdfState` has:
+```kotlin
+// Scroll by a pixel delta (positive y scrolls towards the end). Returns the part that was scrolled.
+state.scrollBy(Offset(0f, 100f))
+// Zoom by a factor, keeping the point under the centroid (relative to PdfView) in place.
+state.zoomBy(zoomFactor = 1.25f, centroid = Offset(x, y))
+```
+
 ## Features
 | Feature                        | Supported | Notes                                                                                                                           |
 | ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------- |
