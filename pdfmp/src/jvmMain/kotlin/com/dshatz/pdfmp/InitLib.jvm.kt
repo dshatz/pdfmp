@@ -20,7 +20,20 @@ actual class InitLib {
         }
     }
 
-    private fun loadLibraryFromJar(baseName: String) {
+    /**
+     * Extracts [baseName] from the jar to a temp file and loads it, once per process.
+     *
+     * [init] runs every time a document is opened. Extracting and loading again each time left a new temp
+     * directory behind per document, and on macOS loading a second copy of the same dylib makes the
+     * Objective-C runtime warn about duplicate classes.
+     *
+     * @return the extracted library file.
+     */
+    internal fun loadLibraryFromJar(baseName: String): File = synchronized(loadedFromJar) {
+        loadedFromJar.getOrPut(baseName) { extractAndLoad(baseName) }
+    }
+
+    private fun extractAndLoad(baseName: String): File {
         val (platformDir, extension, prefix) = getPlatformDetails()
 
         val fileName = "${prefix}${baseName}.${extension}"
@@ -28,8 +41,10 @@ actual class InitLib {
         val resourcePath = "/lib/$platformDir/$fileName"
 
         val tmpDir = createTempDirectory("pdfmp_libs").toFile()
-        tmpDir.deleteOnExit()
         val tmpFile = File(tmpDir, fileName)
+        // Deleted in reverse order of registration: the file first, then the (then empty) directory.
+        tmpDir.deleteOnExit()
+        tmpFile.deleteOnExit()
 
         val resourceStream = InitLib::class.java.getResourceAsStream(resourcePath)
             ?: throw UnsatisfiedLinkError("Native library not found in JAR at: $resourcePath")
@@ -44,6 +59,7 @@ actual class InitLib {
             e("Failed to load library: ${tmpFile.absolutePath}", e)
             throw e
         }
+        return tmpFile
     }
 
     private data class PlatformInfo(val dir: String, val ext: String, val prefix: String)
@@ -73,5 +89,10 @@ actual class InitLib {
     
     companion object {
         var overrideLoadLibrary: ((name: String) -> Unit)? = null
+
+        /**
+         * Libraries already extracted and loaded by [loadLibraryFromJar], by base name.
+         */
+        private val loadedFromJar = mutableMapOf<String, File>()
     }
 }
