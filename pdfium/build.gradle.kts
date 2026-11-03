@@ -1,4 +1,5 @@
 import com.dshatz.jsworker.asWebWorker
+import com.dshatz.kni.allowedTargets
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
@@ -110,7 +111,9 @@ kotlin {
 
 
 dependencies {
-    "kspWasmJs"(libs.jsworker.ksp)
+    if ("wasmJs" in allowedTargets) {
+        "kspWasmJs"(libs.jsworker.ksp)
+    }
 }
 
 fun KotlinNativeTarget.setupPdfiumCinterop() {

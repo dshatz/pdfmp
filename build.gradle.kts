@@ -7,9 +7,3 @@ plugins {
     alias(libs.plugins.publish) apply false
     alias(libs.plugins.testballoon) apply false
 }
-
-buildscript {
-    dependencies {
-        classpath("com.dshatz.pdfmp.buildlogic:build-logic")
-    }
-}

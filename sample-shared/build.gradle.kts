@@ -1,8 +1,7 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
-import com.dshatz.pdfmp.buildlogic.nativeTargets
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
@@ -20,7 +19,7 @@ kotlin {
             mainClass = "com.dshatz.pdfmp.MainKt"
         }
     }
-    androidLibrary {
+    android {
         namespace = "com.dshatz.pdfmp.sampleshared"
         compileSdk = 37
         minSdk = 24
@@ -41,6 +40,7 @@ kotlin {
                 export(project(":pdfmp-compose"))
             }
         }
+        @OptIn(ExperimentalWasmDsl::class)
         wasmJs {
             browser {
                 commonWebpackConfig {
@@ -58,9 +58,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":pdfmp-compose"))
-            implementation(compose.runtime)
-            implementation(compose.material3)
-            implementation(compose.components.resources)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.resources)
             implementation(compose.materialIconsExtended)
 
             implementation(libs.jni.buffers)

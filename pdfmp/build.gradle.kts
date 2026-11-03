@@ -4,18 +4,14 @@ import com.dshatz.jsworker.asWebWorker
 import com.dshatz.kni.bundlesNatives
 import com.dshatz.kni.bundlesPrebuiltNatives
 import com.dshatz.kni.gettingOptional
-import com.dshatz.pdfmp.buildlogic.configureOptional
-import com.dshatz.pdfmp.buildlogic.configureTests
-import com.dshatz.pdfmp.buildlogic.macOsTargets
 import com.vanniktech.maven.publish.DeploymentValidation
 import org.gradle.internal.extensions.stdlib.capitalized
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
-import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 import org.jetbrains.kotlin.konan.target.Family
+import org.jetbrains.kotlin.konan.target.KonanTarget
 
 plugins {
     alias(libs.plugins.mp)
@@ -79,7 +75,8 @@ private fun KotlinNativeTarget.setupSharedLib() {
     }
 }
 
-macOsTargets.forEach { target ->
+fun setupMacosTarget(macosTarget: KotlinNativeTarget) {
+    val target = macosTarget.name
     val capitalizedTarget = target.capitalized()
 
     val patchTask = tasks.register<Exec>("patch${target}Test") {
@@ -230,8 +227,12 @@ kotlin {
             macosX64()
         )
     }
+
     configure(desktopTargets) {
         setupSharedLib()
+        if (this.name.startsWith("macos")) {
+            setupMacosTarget(this)
+        }
     }
 
     jvm {
@@ -349,7 +350,6 @@ kotlin {
         optIn.add("kotlinx.cinterop.ExperimentalForeignApi")
         optIn.add("com.dshatz.pdfmp.InternalPdfmpApi")
     }
-    project.configureTests(this)
 }
 
 dependencies {

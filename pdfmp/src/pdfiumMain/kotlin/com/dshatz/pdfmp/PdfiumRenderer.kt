@@ -1,5 +1,6 @@
 package com.dshatz.pdfmp
 
+import com.dshatz.kni.annotations.JniCall
 import com.dshatz.kni.buffers.ByteBuffer
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 import com.dshatz.pdfmp.pdfium.Availability

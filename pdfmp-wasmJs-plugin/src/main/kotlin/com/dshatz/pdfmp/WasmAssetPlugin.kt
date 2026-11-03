@@ -19,7 +19,7 @@ class WasmAssetPlugin : Plugin<Project> {
         }
 
         project.afterEvaluate {
-            project.tasks.named("wasmJsProcessResources").configure {
+            project.tasks.matching { it.name == "wasmJsProcessResources" }.configureEach {
                 it.dependsOn("injectWasmAsset")
             }
         }

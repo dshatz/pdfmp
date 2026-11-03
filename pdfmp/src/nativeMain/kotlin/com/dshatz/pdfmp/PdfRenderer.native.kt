@@ -130,6 +130,7 @@ actual class PdfRenderer: PdfiumRenderer {
         }
     }
 
+    @JniCall
     override suspend fun renderTileInto(buffer: ImageBuffer, page: PageHandle, tile: PdfTile, frameColor: UInt?) {
         buffer.withFpdfBitmap { bitmap ->
             PdfiumRenderCore.renderTile(
@@ -147,6 +148,7 @@ actual class PdfRenderer: PdfiumRenderer {
         }
     }
 
+    @JniCall
     override suspend fun renderPageInto(buffer: ImageBuffer, page: PageHandle, dimensions: PageDimensions) {
         buffer.withFpdfBitmap { bitmap ->
             PdfiumRenderCore.renderPage(Pdfium, bitmap, page, dimensions.width, dimensions.height)
