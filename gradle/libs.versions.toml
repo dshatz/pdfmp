@@ -1,7 +1,7 @@
 [versions]
 kotlin = "2.3.20"
 jni = "2.4.0-Beta01"
-jsworker = "0.1.2"
+jsworker = "0.1.3"
 agp = "9.4.1"
 publish = "0.37.0"
 skiko = "0.9.22.2"

@@ -1,6 +1,7 @@
 package com.dshatz.pdfmp.pdfium
 
 import de.infix.testBalloon.framework.core.testSuite
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.shouldBe
@@ -91,5 +92,20 @@ val progressiveDocumentTest by testSuite {
         }
         result.missingChunks shouldBe listOf(0, 9)
         chunks.check { Availability.AVAILABLE }.missingChunks shouldBe emptyList()
+    }
+
+    test("partial last chunk") {
+        val chunks = ProgressiveChunks(length = 25, chunkSize = 10)
+        chunks.markReceived(20, 5)
+        chunks.isAvailable(20, 100) shouldBe true // size past the end is clamped
+        chunks.isAvailable(19, 2) shouldBe false
+    }
+
+    test("zero size is always available") {
+        ProgressiveChunks(length = 10, chunkSize = 10).isAvailable(0, 0) shouldBe true
+    }
+
+    test("data beyond the end is rejected") {
+        shouldThrow<IllegalArgumentException> { ProgressiveChunks(10, 10).markReceived(5, 6) }
     }
 }

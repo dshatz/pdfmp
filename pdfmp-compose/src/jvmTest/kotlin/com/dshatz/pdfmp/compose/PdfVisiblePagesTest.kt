@@ -151,5 +151,35 @@ val pdfVisiblePagesTests by testSuite {
             ),
         )
     }
-}
 
+    test("zoom is clamped to 1..5") {
+        val state = getMockedState()
+        state.zoomBy(100f, Offset.Zero)
+        state.scale.value shouldBe 5f
+        state.zoomBy(0.001f, Offset.Zero)
+        state.scale.value shouldBe 1f
+    }
+
+    test("zoom keeps the point under the centroid fixed") {
+        val state = getMockedState()
+        state.onScroll(Offset(0f, -400f))
+        state.zoomBy(2f, Offset(0f, 100f)) // absolute y 500 becomes 1000, minus centroid 100
+        state.visiblePages.value.first().topCutoff shouldBe 900f
+    }
+
+    test("scroll is clamped to the document") {
+        val state = getMockedState()
+        state.onScroll(Offset(-500f, 500f)) // no horizontal room at 1x, nothing above the top
+        state.visiblePages.value.first() shouldBe VisiblePageInfo(0, scaledWidth = 1000f, scaledHeight = 1000f)
+    }
+
+    test("pagesToRender adds neighbours of the visible pages") {
+        val state = getMockedState(viewportSize = Size(1000f, 1000f))
+        state.onScroll(Offset(0f, -2500f)) // page 2 only
+        state.pagesToRender.value shouldBe listOf(2, 1, 3)
+    }
+
+    test("spacing scales with zoom and truncates") {
+        getMockedState(gap = 10).scaledPageSpacing(1.55f) shouldBe 15
+    }
+}

@@ -1,0 +1,142 @@
+name: Test
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+  push:
+    branches:
+      - main
+      - develop
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup
+        uses: ./.github/actions/build-setup
+      - name: Build and Test
+        run: |
+          ./gradlew jacocoTestReport --stacktrace \
+            -PnativeTargets=linuxX64 -Pdebug=true
+      - name: Upload Test Report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-report-ubuntu-latest
+          path: ./**/build/test-results/**/*.xml
+          retention-days: 5
+
+  test-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup
+        uses: ./.github/actions/build-setup
+      - name: Build and Test
+        run: ./gradlew jacocoTestReport --stacktrace -PnativeTargets=mingwX64 -Pdebug=true
+      - name: Upload Test Report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-report-windows-latest
+          path: ./**/build/test-results/**/*.xml
+          retention-days: 5
+
+  test-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup
+        uses: ./.github/actions/build-setup
+      - name: Build and Test
+        run: |
+          ./gradlew jacocoTestReport --stacktrace \
+            -PnativeTargets=iosSimulatorArm64,macosArm64 -Pdebug=true
+      - name: Upload Test Report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-report-macos-latest
+          path: ./**/build/test-results/**/*.xml
+          retention-days: 5
+
+  test-android-emulator:
+    # Runs on an x86_64 emulator and needs no secrets, so it also works for fork PRs.
+    strategy:
+      matrix:
+        module: ["pdfmp", "pdfmp-compose"]
+      fail-fast: false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup
+        uses: ./.github/actions/build-setup
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run Instrumentation Tests on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: >
+            ./gradlew :${{ matrix.module }}:connectedAndroidDeviceTest --stacktrace
+            -PnativeTargets=androidNativeX64 -Pdebug=true
+      - name: Upload Test Report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-report-emulator-android-${{ matrix.module }}
+          path: ./${{ matrix.module }}/build/outputs/androidTest-results/**/*.xml
+          retention-days: 5
+
+  publish-results:
+    needs:
+      - test-linux
+      - test-windows
+      - test-macos
+      - test-android-emulator
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v8
+      - name: Multiplatform Test Report
+        uses: dshatz/testballoon-github-reporter@master
+        with:
+          reports: "test-report-*/**/*.xml"
+          platform-hints: |
+            {
+              "test-report-ubuntu-latest/**/*.xml": "Linux",
+              "test-report-windows-latest/**/*.xml": "Windows",
+              "test-report-macos-latest/**/*.xml": "macOS",
+              "test-report-emulator-android-*/**/*.xml": "Android (emulator)"
+            }
