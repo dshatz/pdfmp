@@ -88,7 +88,7 @@ Paths under `pdfmp/src/`, `pdfmp-compose/src/commonMain/kotlin/com/dshatz/pdfmp/
   - `:pdfmp-compose:jvmTest`: tile and page geometry (`VisibleTilesTest`, `PdfVisiblePagesTests`, library loading).
   - `:pdfium:linuxX64Test`: pdfium bindings and `ProgressiveDocument`.
   - There are no wasm tests; `wasmJsTest` tasks are skipped.
-- **Test tasks ignore failures** (`build-logic/.../TestConfiguration.kt` sets `ignoreFailures`). A green build does not mean green tests: read `build/test-results/<task>/*.xml`.
+- A failing test fails its task. Use `--continue` to run all test tasks anyway; results are in `build/test-results/<task>/*.xml`.
 - If a moved or new TestBalloon suite is not picked up, rerun the test compilation with `--rerun`.
 - KSP and the KNI plugin generate code into `build/generated/ksp/...`: look there to see the JNI glue or worker proxies.
 

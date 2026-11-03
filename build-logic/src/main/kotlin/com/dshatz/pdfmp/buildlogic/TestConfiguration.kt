@@ -52,12 +52,10 @@ fun Project.configureTests(kotlin: KotlinMultiplatformExtension) {
     }
     tasks.withType<KotlinJvmTest>().configureEach {
         outputs.upToDateWhen { false }
-        ignoreFailures = true
     }
 
     tasks.withType<KotlinTest>() {
         outputs.upToDateWhen { false }
-        ignoreFailures = true
     }
 
 

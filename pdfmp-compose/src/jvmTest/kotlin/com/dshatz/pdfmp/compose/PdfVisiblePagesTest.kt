@@ -175,8 +175,8 @@ val pdfVisiblePagesTests by testSuite {
 
     test("pagesToRender adds neighbours of the visible pages") {
         val state = getMockedState(viewportSize = Size(1000f, 1000f))
-        state.onScroll(Offset(0f, -2500f)) // page 2 only
-        state.pagesToRender.value shouldBe listOf(2, 1, 3)
+        state.onScroll(Offset(0f, -2500f)) // pages 2 and 3 are visible
+        state.pagesToRender.value shouldBe listOf(2, 3, 1, 4)
     }
 
     test("spacing scales with zoom and truncates") {
