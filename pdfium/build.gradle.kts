@@ -1,5 +1,6 @@
 import com.dshatz.jsworker.asWebWorker
 import com.dshatz.kni.allowedTargets
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins {
@@ -41,6 +42,7 @@ kotlin {
             setupIosFramework()
         }
 
+        @OptIn(ExperimentalWasmDsl::class)
         wasmJs {
             outputModuleName = "kpdfium"
             this.binaries.library()
