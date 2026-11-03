@@ -197,6 +197,12 @@ class PdfState(
         }
     }
 
+    /**
+     * Whether the document is loaded and bound to the [PdfView][com.dshatz.pdfmp.compose.PdfView], so it can be
+     * scrolled and zoomed.
+     */
+    private fun isReady(): Boolean = isInitialized.value && this::listState.isInitialized
+
     internal fun bind(
         listState: LazyListState,
         horizontalScrollState: ScrollState,
@@ -266,6 +272,24 @@ class PdfState(
         }
     }
 
+    /**
+     * Scrolls the document by [delta] pixels, clamped to its bounds.
+     *
+     * Positive y scrolls towards the end of the document and positive x to the right, as in
+     * `ScrollState.scrollBy`. To move the document with a drag, pass the negated drag amount.
+     *
+     * Use this to build your own scroll or pan gestures. Does nothing until the document is shown.
+     *
+     * @return the part of [delta] that was scrolled, which is less than [delta] at the edges.
+     */
+    fun scrollBy(delta: Offset): Offset {
+        if (!isReady()) return Offset.Zero
+        val startX = renderingX.floatValue
+        val startY = renderingY.floatValue
+        onScroll(-delta)
+        return Offset(renderingX.floatValue - startX, renderingY.floatValue - startY)
+    }
+
     internal fun onScroll(delta: Offset): Offset {
         val currentX = renderingX.floatValue
         val currentY = renderingY.floatValue
@@ -288,7 +312,17 @@ class PdfState(
         return delta
     }
 
-    internal fun zoomBy(zoomFactor: Float, centroid: Offset) {
+    /**
+     * Multiplies the zoom by [zoomFactor], keeping the document point under [centroid] in place.
+     *
+     * The zoom stays between 1x (page width fits the view) and 5x.
+     *
+     * Use this to build your own zoom gestures or controls. Does nothing until the document is shown.
+     *
+     * @param centroid point in pixels relative to the top left corner of the [PdfView][com.dshatz.pdfmp.compose.PdfView].
+     */
+    fun zoomBy(zoomFactor: Float, centroid: Offset) {
+        if (!isReady()) return
         val currentScale = scale.value
         val newScale = (currentScale * zoomFactor).coerceIn(1f, 5.0f)
         if (currentScale == newScale) return
