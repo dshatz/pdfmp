@@ -3,6 +3,7 @@
 )
 
 import com.dshatz.pdfmp.buildlogic.configureTests
+import com.vanniktech.maven.publish.DeploymentValidation
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
@@ -104,7 +105,7 @@ kotlin {
 
 mavenPublishing {
     signAllPublications()
-    publishToMavenCentral(true, validateDeployment = false)
+    publishToMavenCentral(true, DeploymentValidation.NONE)
     coordinates("com.dshatz.pdfmp", "pdfmp-compose", project.version.toString())
 
     pom {
