@@ -8,6 +8,5 @@ interface LibInitializer {
     fun loadLibs()
     fun init() {
         loadLibs()
-//        PDFBridge.initNative()
     }
 }

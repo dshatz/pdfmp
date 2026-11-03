@@ -33,13 +33,11 @@ actual object Pdfium: IPdfium {
         size: Int,
         password: String?
     ): DocHandle? {
-        println("LoadMemDocument wasm!")
         val ptr = PdfiumWasm._FPDF_LoadMemDocument(
             data.ptr,
             size,
             null // todo
         ).wasmPointer()
-        println("LoadMemDocument wasm: ptr = $ptr")
         return ptr?.let(::DocHandle)
     }
 

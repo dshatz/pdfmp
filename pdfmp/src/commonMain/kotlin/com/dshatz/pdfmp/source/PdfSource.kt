@@ -13,7 +13,6 @@ import kotlinx.io.files.SystemFileSystem
 @JniSerializerFor(Path::class)
 object PathSerializer: JniSerializer<Path>("kotlinx.io.files.Path") {
     override fun packToBuffer(value: Path, buffer: Buffer) {
-        println("PathSerializer pack")
         buffer.writeLenString(value.toString())
     }
 

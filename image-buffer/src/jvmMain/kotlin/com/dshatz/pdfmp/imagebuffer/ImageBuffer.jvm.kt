@@ -61,7 +61,6 @@ actual object ImageBufferAdapter: JvmJniAdapter<ImageBuffer, SkBitmapInfo> {
 
     override fun fromJniValue(value: SkBitmapInfo): ImageBuffer {
         val addr = value.ptr
-        println("Received buffer address $addr from jvm")
         val data = Data.makeWithoutCopy(
             addr,
             length = value.strideBytes * value.height,
