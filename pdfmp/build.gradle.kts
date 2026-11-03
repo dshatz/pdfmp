@@ -168,7 +168,7 @@ kotlin {
             }
             group("consumer") {
                 group("jniJvm")
-                withIos()
+                group("ios")
                 group("web")
             }
         }
@@ -338,7 +338,7 @@ kotlin {
         }
         webMain.dependencies {
             implementation(project(":pdfium-wasm"))
-            implementation(libs.skiko.fresh)
+            implementation(libs.skiko)
         }
 
         getByName("pdfiumMain").dependencies {

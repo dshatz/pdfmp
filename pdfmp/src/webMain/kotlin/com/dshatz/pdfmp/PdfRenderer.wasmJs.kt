@@ -5,9 +5,7 @@ package com.dshatz.pdfmp
 import com.dshatz.kni.annotations.JniCall
 import com.dshatz.kni.buffers.ByteBuffer
 import com.dshatz.kni.buffers.allocateBuffer
-import com.dshatz.kni.flows.NativeBackedFlow
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
-import com.dshatz.pdfmp.imagebuffer.bytes
 import com.dshatz.pdfmp.pdfium.Availability
 import com.dshatz.pdfmp.pdfium.DataPointer
 import com.dshatz.pdfmp.pdfium.DocHandle
@@ -21,21 +19,13 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.jetbrains.skiko.InternalSkikoApi
-import org.jetbrains.skiko.Version.skiko
-import org.jetbrains.skiko.wasm.awaitSkiko
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
 import org.khronos.webgl.toInt8Array
 
-@OptIn(ExperimentalWasmJsInterop::class, InternalSkikoApi::class)
+@OptIn(ExperimentalWasmJsInterop::class)
 actual class PdfRenderer: PdfiumRenderer {
     val worker = PdfiumWebWorkerWebWorker()
     private val source: PdfSource?
@@ -174,9 +164,9 @@ actual class PdfRenderer: PdfiumRenderer {
     }
 }
 
-@OptIn(ExperimentalWasmJsInterop::class, InternalSkikoApi::class)
+@OptIn(ExperimentalWasmJsInterop::class)
 fun awaitSkiko(callback: (JsAny) -> Unit) = awaitSkiko.then {
-    callback(it)
+    callback(it ?: error("Skiko is null"))
     Unit.toJsReference()
 }
 
