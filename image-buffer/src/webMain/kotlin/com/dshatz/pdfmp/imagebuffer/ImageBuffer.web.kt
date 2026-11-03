@@ -38,8 +38,6 @@ actual data class ImageBuffer(
 
     actual override fun close() {
         if (closed) {
-            // Closing twice would free the same Skia memory twice; it means the pool lost track of this buffer.
-            println("WARN! ImageBuffer ${width}x$height closed twice")
             return
         }
         closed = true

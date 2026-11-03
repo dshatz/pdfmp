@@ -58,7 +58,6 @@ class PdfiumWebWorker: IPdfium by Pdfium {
 
     fun transferBytes(@TransferOwnership data: Int8Array): Ptr {
         return runCatching {
-            println("Transferring byte array of size ${data.byteLength} to Pdfium memory.")
             val dataPtr = Pdfium.malloc(data.byteLength)
 
             writeArray(dataPtr.ptr, data)
