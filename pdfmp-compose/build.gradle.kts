@@ -92,6 +92,8 @@ kotlin {
             implementation(libs.test.kotest)
         }
         jvmTest.dependencies {
+            // Skiko runtime for compose.uiTest.
+            implementation(compose.desktop.currentOs)
             implementation(libs.coroutines.test)
             implementation(libs.mockk)
         }
