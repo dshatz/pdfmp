@@ -76,7 +76,7 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
         val page = pageOpenMutex.withLock {
             // Re-insert so pageHandleCache stays ordered from least to most recently used.
             val handle = pageHandleCache.remove(pageIndex) ?: openPageWhenAvailable(pageIndex) ?: error(
-                "Failed to load page $pageIndex: ${getLastErrorForCustomSource() ?: Pdfium.GetLastError()}"
+                "Failed to load page $pageIndex: ${Pdfium.GetLastError()}"
             )
             pageHandleCache[pageIndex] = handle
             pageUsers[pageIndex] = (pageUsers[pageIndex] ?: 0) + 1
@@ -159,11 +159,6 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
     /** Lets [read] write [size] bytes starting at chunk [firstChunk], then makes them available to pdfium. */
     protected abstract suspend fun progressiveFill(firstChunk: Int, size: Int, read: suspend (ByteBuffer) -> Unit)
 
-    protected fun getLastErrorForCustomSource(): String? {
-        return null // TODO
-//        return (source as? PdfSource.Custom)?.customSourceDescriptor?.sourceAdapter?.getLastError()
-    }
-
     abstract override fun close()
 
     override suspend fun getPageCount(): Int = withContext(pdfiumDispatcher) {
@@ -182,17 +177,9 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
     }
 
     override suspend fun getPageRatio(pageIndex: Int): Float = withContext(pdfiumDispatcher) {
-        val result = runCatching {
-            withPage(pageIndex) { page ->
-                pageRatio(page)
-            }
-        }.recoverCatching {
-            val customSourceError = getLastErrorForCustomSource()
-            if (customSourceError != null) {
-                error(customSourceError)
-            } else throw it
+        withPage(pageIndex) { page ->
+            pageRatio(page)
         }
-        result.getOrThrow()
     }
 
     suspend fun render(page: Int, dimensions: PageDimensions, buffer: ImageBuffer) = withContext(pdfiumDispatcher) {

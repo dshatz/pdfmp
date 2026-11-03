@@ -37,7 +37,7 @@ only the parts needed for the pages on screen are read.
 
 ```kotlin
 PdfData.bytes(byteArray)                              // in memory
-PdfData.file(Path("/path/to/doc.pdf"))                // local file, read in place (not on the web)
+PdfData.file(Path("/path/to/doc.pdf"))                // local file, read in place (on the web: a URL relative to the page)
 PdfData.url("https://example.com/doc.pdf")            // HTTP range requests, or a full download if unsupported
 PdfData.uri(Res.getUri("files/doc.pdf"))              // Compose resources, read in place where possible
 PdfData.uri("content://...")                          // Android: e.g. from the system file picker
@@ -108,7 +108,7 @@ layoutInfo?.apply {
 | Feature                        | Supported | Notes                                                                                                                           |
 | ------------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | Loading from bytes             | ✅        | `PdfData.bytes`. The whole document stays in memory.                                                                            |
-| Loading from path              | ✅        | `PdfData.file`, read in place. Not on the web.                                                                                  |
+| Loading from path              | ✅        | `PdfData.file`, read in place. On the web, a URL relative to the page (there is no file system).                  |
 | Loading from compose resources | ✅        | `PdfData.uri(Res.getUri(…))`, read in place where possible (temporary copy for desktop jars and compressed Android assets).     |
 | Loading from URL               | ✅        | `PdfData.url`: downloads only the parts needed (range requests), else the whole file. Needs CORS on the web.                    |
 | Loading from content URI       | ✅        | Android: `PdfData.uri("content://…")`, e.g. from the system file picker.                                                        |

@@ -77,7 +77,7 @@ actual class PdfRenderer: PdfiumRenderer {
                         this.doc = doc
                         this.sourceBytesPtr = workerDataPtr.ptr
                     }
-                    is PdfSource.PdfPath -> TODO()
+                    is PdfSource.PdfPath -> throw UnsupportedOperationException("File paths are not supported on the web, use PdfData.url or PdfData.fromBlob")
                 }
             } else if (customSource != null) {
                 openProgressive(customSource)
