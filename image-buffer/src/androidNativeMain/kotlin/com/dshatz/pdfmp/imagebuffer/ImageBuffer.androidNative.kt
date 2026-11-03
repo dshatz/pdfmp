@@ -53,7 +53,6 @@ actual data class ImageBuffer(
     actual override fun close() {
         jvm.WithAttachedThread { env ->
             // android (jvm) will release the bitmap itself.
-            println("Deleting Global Ref for ImageBuffer")
             env.DeleteGlobalRef(bitmap)
         }
     }

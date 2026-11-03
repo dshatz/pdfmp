@@ -7,12 +7,15 @@ import com.dshatz.kni.gettingOptional
 import com.dshatz.pdfmp.buildlogic.configureOptional
 import com.dshatz.pdfmp.buildlogic.configureTests
 import com.dshatz.pdfmp.buildlogic.macOsTargets
+import com.vanniktech.maven.publish.DeploymentValidation
 import org.gradle.internal.extensions.stdlib.capitalized
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
+import org.jetbrains.kotlin.konan.target.Family
 
 plugins {
     alias(libs.plugins.mp)
@@ -43,51 +46,25 @@ private val androidArchMap = mapOf(
     "androidNativeX86"   to "android/x86"
 )
 
-fun KotlinNativeTarget.setupPdfiumCinterop() {
-    val targetName = name
-    compilations.getByName("main").cinterops {
-        create("pdfium") {
-            val binariesModuleDir = rootProject.project("pdfium-binaries").projectDir
-            val iosDir = when (targetName) {
-                "iosArm64" -> "ios-arm64"
-                "iosX64", "iosSimulatorArm64" -> "ios-arm64_x86_64-simulator"
-                else -> null // Skip unsupported ios native targets
-            }
-
-            defFile("${projectDir}/cinterop/pdfium/pdfium.def")
-            compilerOpts.add("-I${projectDir}/cinterop/pdfium")
-            packageName("com.dshatz.internal.pdfium")
-
-            // ios only
-            if (iosDir != null) {
-                val libPath = "$binariesModuleDir/binaries/ios-framework/pdfium.xcframework/$iosDir"
-                extraOpts("-staticLibrary", "libpdfium.a", "-libraryPath", libPath)
-            }
-        }
-    }
-}
-
 private fun KotlinNativeTarget.setupSharedLib() {
-    val androidLib = androidArchMap[name]
-    val pdfiumPath = androidLib ?: name
+    val isAndroidNative = this.konanTarget.family == Family.ANDROID
+    val pdfiumPath = androidArchMap[name] ?: name
 
     binaries {
         sharedLib {
             baseName = "pdfmp"
             linkerOpts.add("-rpath")
             linkerOpts.add("\$ORIGIN")
-            if (androidLib != null) {
+            if (isAndroidNative) {
                 linkerOpts("-ljnigraphics")
             }
         }
     }
     // Link against pdfium
     binaries.all {
-        freeCompilerArgs += listOf("-Xadd-light-debug=enable", "-g")
         val binariesModuleDir = project(":pdfium-binaries").projectDir
         linkerOpts.add("-L$binariesModuleDir/binaries/$pdfiumPath")
         linkerOpts.add("-lpdfium")
-
         // Without this we'd link against libcrypt.so.1 unnecessarily and that's
         // not even available in a flatpak.
         // See https://youtrack.jetbrains.com/projects/KT/issues/KT-55643
@@ -97,9 +74,7 @@ private fun KotlinNativeTarget.setupSharedLib() {
     binaries {
         getTest("DEBUG").apply {
             val binariesModuleDir = project(":pdfium-binaries").projectDir.absolutePath
-            val libPath = "$binariesModuleDir/binaries/$pdfiumPath"
-
-            linkerOpts("-rpath", libPath)
+            linkerOpts("-rpath", "$binariesModuleDir/binaries/$pdfiumPath")
         }
     }
 }
@@ -211,7 +186,6 @@ kotlin {
             iosSimulatorArm64()
         )
         configure(iosTargets) {
-            setupPdfiumCinterop()
             setupSharedLib()
             setupIosFramework()
         }
@@ -243,7 +217,6 @@ kotlin {
         )
     }
     configure(androidTargets) {
-        setupPdfiumCinterop()
         setupSharedLib()
         androidLinkerOpts()
     }
@@ -258,7 +231,6 @@ kotlin {
         )
     }
     configure(desktopTargets) {
-        setupPdfiumCinterop()
         setupSharedLib()
     }
 
@@ -275,7 +247,7 @@ kotlin {
         }
     }
 
-    androidLibrary {
+    android {
         namespace = "com.dshatz.pdfmp"
         compileSdk = 37
         minSdk = 24
@@ -381,27 +353,12 @@ kotlin {
 }
 
 dependencies {
-//    "kspJs"(libs.jsworker.ksp)
     "wasmJsWorker"(project(":pdfium-wasm"))
-}
-
-
-fun NamedDomainObjectContainer<KotlinSourceSet>.createMainAndTest(name: String, parent: String, vararg dependants: String): Pair<KotlinSourceSet, KotlinSourceSet> {
-    val main = create("${name}Main")
-    val test = create("${name}Test")
-    main.dependsOn(getByName("${parent}Main"))
-    test.dependsOn(getByName("${parent}Test"))
-
-    dependants.forEach {
-        configureOptional("${it}Main") { dependsOn(main) }
-        configureOptional("${it}Test") { dependsOn(test) }
-    }
-    return main to test
 }
 
 mavenPublishing {
     signAllPublications()
-    publishToMavenCentral(true, validateDeployment = false)
+    publishToMavenCentral(true, DeploymentValidation.NONE)
     coordinates("com.dshatz.pdfmp", "pdfmp", project.version.toString())
 
     pom {
