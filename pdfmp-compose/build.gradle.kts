@@ -1,10 +1,8 @@
-@file:OptIn(ExperimentalComposeLibrary::class, ExperimentalKotlinGradlePluginApi::class,
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class,
     ExperimentalWasmDsl::class
 )
 
-import com.dshatz.pdfmp.buildlogic.configureTests
 import com.vanniktech.maven.publish.DeploymentValidation
-import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
@@ -80,13 +78,13 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":pdfmp"))
-            implementation(compose.runtime)
-            implementation(compose.material3)
-            implementation(compose.foundation)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.foundation)
         }
         commonTest.dependencies {
             implementation(libs.coroutines.test)
-            implementation(compose.uiTest)
+            implementation(libs.compose.ui.test)
             implementation(libs.test.core)
             implementation(libs.test.kotest)
         }
@@ -99,7 +97,6 @@ kotlin {
             implementation("androidx.test:runner:1.7.0")
         }
     }
-    configureTests(this)
 }
 
 
