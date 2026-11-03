@@ -11,6 +11,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import com.dshatz.pdfmp.compose.state.PdfState
 
@@ -37,7 +38,7 @@ enum class DesktopPlatform {
     Unknown
 }
 
-private val CurrentPlatform: DesktopPlatform by lazy {
+internal val CurrentPlatform: DesktopPlatform by lazy {
     val name = System.getProperty("os.name")
     when {
         name?.startsWith("Linux") == true -> DesktopPlatform.Linux
@@ -58,6 +59,9 @@ fun Modifier.biDirectionalScroll(
 ): Modifier {
     return this.onPointerEvent(PointerEventType.Scroll, PointerEventPass.Initial) { event ->
         val changes = event.changes
+
+        // Ctrl+wheel zooms (see desktopZoom), and a consumed event was handled by someone else.
+        if (event.keyboardModifiers.isCtrlPressed || changes.any { it.isConsumed }) return@onPointerEvent
 
         val deltaX = changes.fold(0f) { acc, change -> acc + change.scrollDelta.x }
         val deltaY = -changes.fold(0f) { acc, change -> acc + change.scrollDelta.y }

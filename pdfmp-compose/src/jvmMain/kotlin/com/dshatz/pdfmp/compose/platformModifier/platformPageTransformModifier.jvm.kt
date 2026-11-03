@@ -1,5 +1,6 @@
 package com.dshatz.pdfmp.compose.platformModifier
 
+import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -17,19 +18,21 @@ actual fun Modifier.platformPageTransformModifier(state: PdfState): Modifier = c
 private fun Modifier.desktopZoom(
     state: PdfState
 ): Modifier = composed {
+    val zoomStep = remember { WheelZoomStep(WheelZoomStep.smoothDeltaPerNotch(CurrentPlatform)) }
     onPointerEvent(PointerEventType.Companion.Scroll, PointerEventPass.Initial) { event ->
         val eventChange = event.changes.first()
 
-        if (event.keyboardModifiers.isCtrlPressed) {
+        // A consumed event was handled by someone else, e.g. an app's own zoom handler further out.
+        if (event.keyboardModifiers.isCtrlPressed && !eventChange.isConsumed) {
             eventChange.consume()
 
-            val scrollDelta = eventChange.scrollDelta
-            val zoomFactor = if (scrollDelta.y < 0) 1.1f else 0.9f
-
-            state.zoomBy(
-                zoomFactor = zoomFactor,
-                centroid = eventChange.position
-            )
+            val zoomFactor = zoomStep.zoomFactor(eventChange.scrollDelta.y, eventChange.uptimeMillis)
+            if (zoomFactor != 1f) {
+                state.zoomBy(
+                    zoomFactor = zoomFactor,
+                    centroid = eventChange.position
+                )
+            }
         }
     }
 }
