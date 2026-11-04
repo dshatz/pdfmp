@@ -7,10 +7,13 @@ import com.dshatz.kni.bundlesPrebuiltNatives
 import com.dshatz.kni.gettingOptional
 import com.vanniktech.maven.publish.DeploymentValidation
 import org.gradle.internal.extensions.stdlib.capitalized
+import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
+import org.jetbrains.kotlin.gradle.tasks.KotlinTest
 import org.jetbrains.kotlin.konan.target.Family
 import org.jetbrains.kotlin.konan.target.KonanTarget
 
@@ -406,4 +409,17 @@ kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarge
             }
         }
     }
+}
+
+tasks.withType<Test>().configureEach {
+    outputs.upToDateWhen { false }
+    failOnNoDiscoveredTests = false
+}
+
+tasks.withType<KotlinNativeTest>().configureEach {
+    outputs.upToDateWhen { false }
+}
+
+tasks.withType<KotlinTest>().configureEach {
+    outputs.upToDateWhen { false }
 }
