@@ -47,7 +47,7 @@ compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.re
 compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose" }
 compose-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose" }
 
-test-core = { module = "de.infix.testBalloon:testBalloon-framework-core", version = "testballoon" }
+test-core = { module = "de.infix.testBalloon:testBalloon-framework-core", version.ref = "testballoon" }
 test-kotest = { module = "de.infix.testBalloon:testBalloon-integration-kotest-assertions", version.ref = "testballoon" }
 browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version = "0.5.0" }
 atomic = { module = "org.jetbrains.kotlinx:atomicfu", version = "0.33.0" }
