@@ -33,9 +33,12 @@ develocity {
 includeBuild("pdfmp-wasmJs-plugin")
 
 // Same list the kni plugin reads; unset means all targets.
-val allowedTargets = java.util.Properties().apply {
-    file("local.properties").takeIf { it.exists() }?.reader()?.use(::load)
-}.getProperty("kniAllowedTargets")?.split(",")?.map { it.trim() }
+val allowedTargets = (
+    providers.gradleProperty("kniAllowedTargets").orNull
+        ?: java.util.Properties().apply {
+            file("local.properties").takeIf { it.exists() }?.reader()?.use(::load)
+        }.getProperty("kniAllowedTargets")
+    )?.split(",")?.map { it.trim() }
 val wasmEnabled = allowedTargets == null || "wasmJs" in allowedTargets
 
 include(":pdfmp")

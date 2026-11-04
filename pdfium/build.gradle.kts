@@ -28,6 +28,24 @@ kotlin {
     applyDefaultHierarchyTemplate()
     jvmToolchain(21)
 
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        outputModuleName = "kpdfium"
+        this.binaries.library()
+        browser {
+            commonWebpackConfig {
+                output?.library = "kpdfium"
+            }
+            testTask {
+                useKarma {
+                    useFirefox()
+                }
+            }
+        }
+        asWebWorker()
+        nodejs()
+    }
+
     optionalTargets {
 
         val iosTargets = listOfNotNull(
@@ -40,25 +58,6 @@ kotlin {
             setupSharedLib()
             setupIosFramework()
         }
-
-        @OptIn(ExperimentalWasmDsl::class)
-        wasmJs {
-            outputModuleName = "kpdfium"
-            this.binaries.library()
-            browser {
-                commonWebpackConfig {
-                    output?.library = "kpdfium"
-                }
-                testTask {
-                    useKarma {
-                        useFirefox()
-                    }
-                }
-            }
-            asWebWorker()
-            nodejs()
-        }
-
     }
 
     val androidTargets = optionalTargets.run {
