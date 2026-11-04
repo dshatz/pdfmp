@@ -1,7 +1,10 @@
 import com.dshatz.jsworker.asWebWorker
 import com.dshatz.kni.allowedTargets
+import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
+import org.jetbrains.kotlin.gradle.tasks.KotlinTest
 
 plugins {
     alias(libs.plugins.mp)
@@ -212,4 +215,17 @@ fun KotlinNativeTarget.androidLinkerOpts() {
         linkerOpts("-z", "common-page-size=16384")
         linkerOpts("-Wl,--allow-shlib-undefined")
     }
+}
+
+tasks.withType<Test>().configureEach {
+    outputs.upToDateWhen { false }
+    failOnNoDiscoveredTests = false
+}
+
+tasks.withType<KotlinNativeTest>().configureEach {
+    outputs.upToDateWhen { false }
+}
+
+tasks.withType<KotlinTest>().configureEach {
+    outputs.upToDateWhen { false }
 }

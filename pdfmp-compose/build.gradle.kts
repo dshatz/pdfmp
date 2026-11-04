@@ -3,9 +3,12 @@
 )
 
 import com.vanniktech.maven.publish.DeploymentValidation
+import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
+import org.jetbrains.kotlin.gradle.tasks.KotlinTest
 
 plugins {
     alias(libs.plugins.mp)
@@ -135,3 +138,16 @@ mavenPublishing {
 // This module has no Compose UI tests in the browser. The check would require `binaries.executable()`, which a
 // library target doesn't need, and it runs even without any wasm test sources.
 tasks.matching { it.name == "checkComposeUiTestConfigurationForWasmJs" }.configureEach { enabled = false }
+
+tasks.withType<Test>().configureEach {
+    outputs.upToDateWhen { false }
+    failOnNoDiscoveredTests = false
+}
+
+tasks.withType<KotlinNativeTest>().configureEach {
+    outputs.upToDateWhen { false }
+}
+
+tasks.withType<KotlinTest>().configureEach {
+    outputs.upToDateWhen { false }
+}
