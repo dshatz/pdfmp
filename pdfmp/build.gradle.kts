@@ -286,6 +286,7 @@ kotlin {
             implementation(libs.test.kotest)
         }
         named("androidDeviceTest") {
+            dependsOn(getByName("consumerTest"))
             dependencies {
                 implementation(libs.test.core)
                 implementation("androidx.test:runner:1.7.0")
