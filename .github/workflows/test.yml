@@ -29,7 +29,7 @@ jobs:
       - name: Build and Test
         run: |
           ./gradlew allTests --continue --stacktrace \
-            -PnativeTargets=linuxX64 -Pdebug=true
+            -PkniAllowedTargets=linuxX64 -Pdebug=true
       - name: Upload Test Report
         uses: actions/upload-artifact@v7
         if: always()
@@ -48,7 +48,7 @@ jobs:
       - name: Setup
         uses: ./.github/actions/build-setup
       - name: Build and Test
-        run: ./gradlew allTests --continue --stacktrace -PnativeTargets=mingwX64 -Pdebug=true
+        run: ./gradlew allTests --continue --stacktrace -PkniAllowedTargets=mingwX64 -Pdebug=true
       - name: Upload Test Report
         uses: actions/upload-artifact@v7
         if: always()
@@ -69,7 +69,7 @@ jobs:
       - name: Build and Test
         run: |
           ./gradlew allTests --continue --stacktrace \
-            -PnativeTargets=iosSimulatorArm64,macosArm64 -Pdebug=true
+            -PkniAllowedTargets=iosSimulatorArm64,macosArm64 -Pdebug=true
       - name: Upload Test Report
         uses: actions/upload-artifact@v7
         if: always()
@@ -106,7 +106,7 @@ jobs:
           disable-animations: true
           script: >
             ./gradlew :${{ matrix.module }}:connectedAndroidDeviceTest --stacktrace
-            -PnativeTargets=androidNativeX64 -Pdebug=true
+            -PkniAllowedTargets=androidNativeX64 -Pdebug=true
       - name: Upload Test Report
         uses: actions/upload-artifact@v7
         if: always()
