@@ -39,6 +39,7 @@ kotlin {
         namespace = "com.dshatz.pdfmp.compose"
         compileSdk = 37
         minSdk = 24
+        androidResources.enable = true
 
         withDeviceTestBuilder {
             sourceSetTreeName = "test"
