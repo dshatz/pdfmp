@@ -10,7 +10,7 @@ val pdfiumTest by testSuite {
     }
 
     test("Load from path") {
-        val doc = Pdfium.LoadDocument("../sample-shared/src/commonMain/composeResources/files/sample.pdf", null)!!
+        val doc = Pdfium.LoadDocument(SAMPLE_PDF, null)!!
         Pdfium.GetPageCount(doc) shouldBe 9
     }
 }

@@ -146,8 +146,10 @@ tasks.withType<Test>().configureEach {
 
 tasks.withType<KotlinNativeTest>().configureEach {
     outputs.upToDateWhen { false }
+    failOnNoDiscoveredTests = false
 }
 
 tasks.withType<KotlinTest>().configureEach {
     outputs.upToDateWhen { false }
+    failOnNoDiscoveredTests = false
 }

@@ -54,7 +54,6 @@ atomic = { module = "org.jetbrains.kotlinx:atomicfu", version = "0.33.0" }
 
 # For zero-copy bitmap on desktop.
 skiko = { module = "org.jetbrains.skiko:skiko", version.ref = "skiko" }
-skiko-fresh = { module = "org.jetbrains.skiko:skiko", version = "0.150.2" }
 
 # Android
 appcompat = { module = "androidx.appcompat:appcompat", version = "1.8.0" }

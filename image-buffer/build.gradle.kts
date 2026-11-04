@@ -93,9 +93,12 @@ kotlin {
             browser()
         }
 
-        js(IR) {
-            binaries.library()
-            browser()
+        // Not covered by optionalTargets; follows the wasm switch from settings.gradle.kts.
+        if (gradle.extra["wasmEnabled"] as Boolean) {
+            js(IR) {
+                binaries.library()
+                browser()
+            }
         }
 
         iosX64()

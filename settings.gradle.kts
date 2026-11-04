@@ -40,6 +40,7 @@ val allowedTargets = (
         }.getProperty("kniAllowedTargets")
     )?.split(",")?.map { it.trim() }
 val wasmEnabled = allowedTargets == null || "wasmJs" in allowedTargets
+gradle.extra["wasmEnabled"] = wasmEnabled
 
 include(":pdfmp")
 include(":pdfium")
@@ -49,8 +50,8 @@ include(":androidapp")
 include(":sample-shared")
 include(":image-buffer")
 include(":pdfium-binaries")
-include(":pdfium-wasm")
 if (wasmEnabled) {
+    include(":pdfium-wasm")
     include(":webapp")
 }
 rootProject.name = "pdf-multiplatform"
