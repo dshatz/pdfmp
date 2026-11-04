@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class, ExperimentalWasmDsl::class)
 
 import com.dshatz.jsworker.asWebWorker
+import com.dshatz.kni.allowedTargets
 import com.dshatz.kni.bundlesNatives
 import com.dshatz.kni.bundlesPrebuiltNatives
 import com.dshatz.kni.gettingOptional
