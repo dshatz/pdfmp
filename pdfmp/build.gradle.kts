@@ -22,7 +22,6 @@ plugins {
     alias(libs.plugins.android.lib)
     alias(libs.plugins.testballoon)
     alias(libs.plugins.jsworker)
-    jacoco
 }
 
 group = "com.dshatz"
@@ -388,11 +387,6 @@ mavenPublishing {
     }
 }
 
-
-jacoco {
-    toolVersion = "0.8.14"
-    reportsDirectory = layout.buildDirectory.dir("jacocoReports")
-}
 
 
 // Copy test resources to jvm

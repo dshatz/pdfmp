@@ -12,7 +12,6 @@ plugins {
     alias(libs.plugins.testballoon)
     alias(libs.plugins.jsworker)
     alias(libs.plugins.wasmplugin)
-    jacoco
 }
 
 private val androidArchMap = mapOf(

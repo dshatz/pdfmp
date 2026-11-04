@@ -16,7 +16,6 @@ plugins {
     alias(libs.plugins.android.lib)
     alias(libs.plugins.kni)
     alias(libs.plugins.publish)
-    jacoco
 }
 
 version = project.findProperty("version") as? String ?: "0.1.0-SNAPSHOT1"
@@ -132,10 +131,6 @@ mavenPublishing {
     }
 }
 
-jacoco {
-    toolVersion = "0.8.14"
-    reportsDirectory = layout.buildDirectory.dir("jacocoReports")
-}
 // This module has no Compose UI tests in the browser. The check would require `binaries.executable()`, which a
 // library target doesn't need, and it runs even without any wasm test sources.
 tasks.matching { it.name == "checkComposeUiTestConfigurationForWasmJs" }.configureEach { enabled = false }
