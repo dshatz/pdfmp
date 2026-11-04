@@ -17,6 +17,8 @@ plugins {
     alias(libs.plugins.wasmplugin)
 }
 
+apply(from = rootProject.file("gradle/native-test-runtime.gradle.kts"))
+
 private val androidArchMap = mapOf(
     "androidNativeArm64" to "android/arm64-v8a",
     "androidNativeX64"   to "android/x86_64",
@@ -31,25 +33,25 @@ kotlin {
     applyDefaultHierarchyTemplate()
     jvmToolchain(21)
 
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
-        outputModuleName = "kpdfium"
-        this.binaries.library()
-        browser {
-            commonWebpackConfig {
-                output?.library = "kpdfium"
-            }
-            testTask {
-                useKarma {
-                    useFirefox()
+    optionalTargets {
+        @OptIn(ExperimentalWasmDsl::class)
+        wasmJs {
+            outputModuleName = "kpdfium"
+            this.binaries.library()
+            browser {
+                commonWebpackConfig {
+                    output?.library = "kpdfium"
+                }
+                testTask {
+                    useKarma {
+                        useFirefox()
+                    }
                 }
             }
+            asWebWorker()
+            nodejs()
         }
-        asWebWorker()
-        nodejs()
-    }
 
-    optionalTargets {
 
         val iosTargets = listOfNotNull(
             iosX64(),
@@ -169,14 +171,6 @@ private fun KotlinNativeTarget.setupSharedLib() {
         if (targetName.contains("linux")) linkerOpts.add("-Wl,--as-needed")
     }
 
-    binaries {
-        getTest("DEBUG").apply {
-            val binariesModuleDir = project(":pdfium-binaries").projectDir.absolutePath
-            val libPath = "$binariesModuleDir/binaries/$pdfiumPath"
-
-            linkerOpts("-rpath", libPath)
-        }
-    }
 }
 
 fun KotlinNativeTarget.setupIosFramework() {
@@ -224,8 +218,10 @@ tasks.withType<Test>().configureEach {
 
 tasks.withType<KotlinNativeTest>().configureEach {
     outputs.upToDateWhen { false }
+    failOnNoDiscoveredTests = false
 }
 
 tasks.withType<KotlinTest>().configureEach {
     outputs.upToDateWhen { false }
+    failOnNoDiscoveredTests = false
 }

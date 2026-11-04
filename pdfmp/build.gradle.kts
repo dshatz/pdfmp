@@ -6,13 +6,11 @@ import com.dshatz.kni.bundlesNatives
 import com.dshatz.kni.bundlesPrebuiltNatives
 import com.dshatz.kni.gettingOptional
 import com.vanniktech.maven.publish.DeploymentValidation
-import org.gradle.internal.extensions.stdlib.capitalized
 import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
-import org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink
 import org.jetbrains.kotlin.gradle.tasks.KotlinTest
 import org.jetbrains.kotlin.konan.target.Family
 import org.jetbrains.kotlin.konan.target.KonanTarget
@@ -27,6 +25,8 @@ plugins {
     alias(libs.plugins.testballoon)
     alias(libs.plugins.jsworker)
 }
+
+apply(from = rootProject.file("gradle/native-test-runtime.gradle.kts"))
 
 group = "com.dshatz"
 version = project.findProperty("version") as? String ?: "0.1.0-SNAPSHOT1"
@@ -70,33 +70,6 @@ private fun KotlinNativeTarget.setupSharedLib() {
         if (targetName.contains("linux")) linkerOpts.add("-Wl,--as-needed")
     }
 
-    binaries {
-        getTest("DEBUG").apply {
-            val binariesModuleDir = project(":pdfium-binaries").projectDir.absolutePath
-            linkerOpts("-rpath", "$binariesModuleDir/binaries/$pdfiumPath")
-        }
-    }
-}
-
-fun setupMacosTarget(macosTarget: KotlinNativeTarget) {
-    val target = macosTarget.name
-    val capitalizedTarget = target.capitalized()
-
-    val patchTask = tasks.register<Exec>("patch${target}Test") {
-        val originalDylibPath = project(":pdfium-binaries").projectDir.absolutePath + "/binaries/${target}/libpdfium.dylib"
-        executable = "install_name_tool"
-        argumentProviders.add(CommandLineArgumentProvider {
-            val linkTask = tasks.named<KotlinNativeLink>("linkDebugTest$capitalizedTarget").get()
-            val testBinary = linkTask.outputFile.get().absolutePath
-            listOf("-change", "./libpdfium.dylib", originalDylibPath, testBinary)
-        })
-    }
-
-    tasks.withType<KotlinNativeLink>().configureEach {
-        if (name == "linkDebugTest$capitalizedTarget") {
-            finalizedBy(patchTask)
-        }
-    }
 }
 
 fun KotlinNativeTarget.setupIosFramework() {
@@ -233,9 +206,6 @@ kotlin {
 
     configure(desktopTargets) {
         setupSharedLib()
-        if (this.name.startsWith("macos")) {
-            setupMacosTarget(this)
-        }
     }
 
     jvm {
@@ -340,7 +310,9 @@ kotlin {
             implementation("org.jetbrains.skiko:skiko-awt-runtime-$targetOs-$targetArch:$skikoVersion")
         }
         webMain.dependencies {
-            implementation(project(":pdfium-wasm"))
+            if ("wasmJs" in allowedTargets) {
+                implementation(project(":pdfium-wasm"))
+            }
             implementation(libs.skiko)
         }
 
@@ -356,7 +328,9 @@ kotlin {
 }
 
 dependencies {
-    "wasmJsWorker"(project(":pdfium-wasm"))
+    if ("wasmJs" in allowedTargets) {
+        "wasmJsWorker"(project(":pdfium-wasm"))
+    }
 }
 
 mavenPublishing {
@@ -418,8 +392,10 @@ tasks.withType<Test>().configureEach {
 
 tasks.withType<KotlinNativeTest>().configureEach {
     outputs.upToDateWhen { false }
+    failOnNoDiscoveredTests = false
 }
 
 tasks.withType<KotlinTest>().configureEach {
     outputs.upToDateWhen { false }
+    failOnNoDiscoveredTests = false
 }

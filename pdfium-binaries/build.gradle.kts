@@ -1,27 +1,27 @@
-@file:OptIn(ExperimentalWasmDsl::class)
-
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 plugins {
     id("base")
     id("maven-publish")
-    alias(libs.plugins.mp)
+    alias(libs.plugins.mp) apply false
 }
 
 group = "com.dshatz"
 
-kotlin {
-    jvmToolchain(21)
-    applyDefaultHierarchyTemplate()
-    wasmJs {
-        browser()
-        binaries.library()
-    }
-
-    sourceSets {
-        wasmJsMain.configure {
-            resources.srcDir(layout.projectDirectory.dir("binaries/wasmJs"))
+// Set in settings.gradle.kts (-PkniAllowedTargets or local.properties).
+// Kotlin is only needed for the wasm resources; without a target the plugin would fail.
+if (gradle.extra["wasmEnabled"] as Boolean) {
+    apply(plugin = "org.jetbrains.kotlin.multiplatform")
+    extensions.configure<KotlinMultiplatformExtension> {
+        jvmToolchain(21)
+        applyDefaultHierarchyTemplate()
+        @OptIn(ExperimentalWasmDsl::class)
+        wasmJs {
+            browser()
+            binaries.library()
         }
+        sourceSets.getByName("wasmJsMain").resources.srcDir(layout.projectDirectory.dir("binaries/wasmJs"))
     }
 }
 

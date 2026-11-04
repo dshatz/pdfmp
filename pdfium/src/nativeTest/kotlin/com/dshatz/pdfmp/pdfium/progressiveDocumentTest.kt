@@ -19,7 +19,6 @@ import platform.posix.fseek
 import platform.posix.ftell
 import platform.posix.memcpy
 
-private const val SAMPLE = "../sample-shared/src/commonMain/composeResources/files/sample.pdf"
 private const val CHUNK = 16 * 1024
 
 @OptIn(ExperimentalForeignApi::class)
@@ -56,7 +55,7 @@ private fun ProgressiveDocument.load(bytes: ByteArray, fetched: MutableSet<Int>,
 val progressiveDocumentTest by testSuite {
     test("opens a document and its pages with only the chunks pdfium asks for") {
         Pdfium.InitLibrary()
-        val bytes = readFile(SAMPLE)
+        val bytes = readFile(SAMPLE_PDF)
         val document = ProgressiveDocument(bytes.size, CHUNK)
         val fetched = mutableSetOf<Int>()
 
