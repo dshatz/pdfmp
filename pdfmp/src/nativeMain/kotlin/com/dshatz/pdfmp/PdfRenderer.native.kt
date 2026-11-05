@@ -25,6 +25,8 @@ import kotlinx.cinterop.pin
 import kotlinx.cinterop.toLong
 
 
+// render, renderTile, getPageCount and getPageRatio are inherited from PdfiumRenderer, so the expect's @JniCall can't be repeated here.
+@Suppress("ACTUAL_ANNOTATIONS_NOT_MATCH_EXPECT")
 @OptIn(ExperimentalForeignApi::class)
 actual class PdfRenderer: PdfiumRenderer {
 
@@ -116,8 +118,9 @@ actual class PdfRenderer: PdfiumRenderer {
 
     /** Wraps [this] buffer's memory in a pdfium bitmap, so pdfium renders straight into it. */
     private fun ImageBuffer.withFpdfBitmap(block: (bitmap: PdfiumBitmap) -> Unit) {
+        // Casts go via Any: ImageBuffer is an expect class here, and the actuals implement these interfaces.
         try {
-            (this as WritableImageBuffer).withWritableAddress {
+            (this as Any as WritableImageBuffer).withWritableAddress {
                 val bitmap = fpdfBitmap(it.toLong())
                 try {
                     block(bitmap)
@@ -126,7 +129,7 @@ actual class PdfRenderer: PdfiumRenderer {
                 }
             }
         } finally {
-            (this as? AutoCloseable)?.close()
+            (this as Any as? AutoCloseable)?.close()
         }
     }
 
