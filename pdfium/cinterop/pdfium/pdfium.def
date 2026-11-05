@@ -2,3 +2,16 @@ headers = include/fpdfview.h include/fpdf_dataavail.h
 
 headerFilter = include/*
 compilerOpts = -DFPDF_EXPORT= -DFPDF_CALLCONV=
+---
+
+#include <stdint.h>
+
+// FPDF_DWORD is `unsigned long`: 32 bits on Windows, 64 on Linux/macOS, which the commonizer rejects.
+// These wrappers use a fixed width instead.
+static inline void pdfmp_FillRect(FPDF_BITMAP bitmap, int left, int top, int width, int height, uint32_t color) {
+    FPDFBitmap_FillRect(bitmap, left, top, width, height, (FPDF_DWORD)color);
+}
+
+static inline uint32_t pdfmp_GetLastError(void) {
+    return (uint32_t)FPDF_GetLastError();
+}

@@ -3,11 +3,9 @@ package com.dshatz.pdfmp.pdfium
 import com.dshatz.internal.pdfium.FPDFBitmap_BGRA
 import com.dshatz.internal.pdfium.FPDFBitmap_CreateEx
 import com.dshatz.internal.pdfium.FPDFBitmap_Destroy
-import com.dshatz.internal.pdfium.FPDFBitmap_FillRect
 import com.dshatz.internal.pdfium.FPDF_CloseDocument
 import com.dshatz.internal.pdfium.FPDF_ClosePage
 import com.dshatz.internal.pdfium.FPDF_DestroyLibrary
-import com.dshatz.internal.pdfium.FPDF_GetLastError
 import com.dshatz.internal.pdfium.FPDF_GetPageCount
 import com.dshatz.internal.pdfium.FPDF_GetPageHeightF
 import com.dshatz.internal.pdfium.FPDF_GetPageWidthF
@@ -20,6 +18,8 @@ import com.dshatz.internal.pdfium.FPDF_RenderPageBitmap
 import com.dshatz.internal.pdfium.FPDF_RenderPageBitmapWithMatrix
 import com.dshatz.internal.pdfium.FS_MATRIX
 import com.dshatz.internal.pdfium.FS_RECTF
+import com.dshatz.internal.pdfium.pdfmp_FillRect
+import com.dshatz.internal.pdfium.pdfmp_GetLastError
 import kotlinx.cinterop.cValue
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
@@ -126,13 +126,13 @@ actual object Pdfium: IPdfium {
         height: Int,
         color: UInt
     ) {
-        FPDFBitmap_FillRect(
+        pdfmp_FillRect(
             bitmap.bitmap,
             left,
             top,
             width,
             height,
-            color.convert()
+            color
         )
     }
 
@@ -170,6 +170,6 @@ actual object Pdfium: IPdfium {
     }
 
     actual override fun GetLastError(): ULong {
-        return FPDF_GetLastError().convert()
+        return pdfmp_GetLastError().toULong()
     }
 }
