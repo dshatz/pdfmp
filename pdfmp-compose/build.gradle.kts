@@ -10,9 +10,14 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinTest
 
+
 plugins {
     alias(libs.plugins.mp)
-    alias(libs.plugins.compose)
+    if (freshCompose) {
+        alias(libs.plugins.compose.fresh)
+    } else {
+        alias(libs.plugins.compose)
+    }
     alias(libs.plugins.compose.kt)
     alias(libs.plugins.testballoon)
     alias(libs.plugins.ksp) // for testballoon
@@ -81,13 +86,22 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":pdfmp"))
-            implementation(libs.compose.runtime)
+            if (freshCompose) {
+                implementation(libs.compose.runtime.fresh)
+                implementation(libs.compose.foundation.fresh)
+            } else {
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.foundation)
+            }
             implementation(libs.compose.material3)
-            implementation(libs.compose.foundation)
         }
         commonTest.dependencies {
             implementation(libs.coroutines.test)
-            implementation(libs.compose.ui.test)
+            if (freshCompose) {
+                implementation(libs.compose.ui.test.fresh)
+            } else {
+                implementation(libs.compose.ui.test)
+            }
             implementation(libs.test.core)
             implementation(libs.test.kotest)
         }

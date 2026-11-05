@@ -8,8 +8,10 @@ mockk = "1.14.11"
 publish = "0.37.0"
 runner = "1.7.0"
 skiko = "0.9.22.2"
+skiko-fresh = "0.156.1"
 testballoon = "1.2.0"
 compose = "1.10.3"
+compose-fresh = "1.13.0-beta02"
 
 [plugins]
 mp = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -19,6 +21,7 @@ android-app = { id = "com.android.application", version.ref = "agp" }
 ksp = { id = "com.google.devtools.ksp", version = "2.3.9" }
 compose-kt = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 compose = { id = "org.jetbrains.compose", version.ref = "compose" } # Last version with iosX64
+compose-fresh = { id = "org.jetbrains.compose", version.ref = "compose-fresh" }
 publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
 testballoon = { id = "de.infix.testBalloon", version.ref = "testballoon" }
 kni = { id = "com.dshatz.kni", version.ref = "jni" }
@@ -47,6 +50,11 @@ compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.re
 compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose" }
 compose-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose" }
 
+compose-foundation-fresh = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-fresh" }
+compose-runtime-fresh = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-fresh" }
+compose-ui-test-fresh = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-fresh" }
+compose-resources-fresh = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose-fresh" }
+
 test-core = { module = "de.infix.testBalloon:testBalloon-framework-core", version.ref = "testballoon" }
 test-kotest = { module = "de.infix.testBalloon:testBalloon-integration-kotest-assertions", version.ref = "testballoon" }
 browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version = "0.5.0" }
@@ -54,6 +62,7 @@ atomic = { module = "org.jetbrains.kotlinx:atomicfu", version = "0.33.0" }
 
 # For zero-copy bitmap on desktop.
 skiko = { module = "org.jetbrains.skiko:skiko", version.ref = "skiko" }
+skiko-fresh = { module = "org.jetbrains.skiko:skiko", version.ref = "skiko-fresh" }
 
 # Android
 appcompat = { module = "androidx.appcompat:appcompat", version = "1.8.0" }

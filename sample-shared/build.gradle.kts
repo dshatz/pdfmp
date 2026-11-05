@@ -6,7 +6,11 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
 
 plugins {
     alias(libs.plugins.mp)
-    alias(libs.plugins.compose)
+    if (freshCompose) {
+        alias(libs.plugins.compose.fresh)
+    } else {
+        alias(libs.plugins.compose)
+    }
     alias(libs.plugins.kni)
     alias(libs.plugins.compose.kt)
     alias(libs.plugins.android.lib)
@@ -58,9 +62,14 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":pdfmp-compose"))
-            implementation(libs.compose.runtime)
+            if (freshCompose) {
+                implementation(libs.compose.runtime.fresh)
+                implementation(libs.compose.resources.fresh)
+            } else {
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.resources)
+            }
             implementation(libs.compose.material3)
-            implementation(libs.compose.resources)
             implementation(compose.materialIconsExtended)
 
             implementation(libs.jni.buffers)

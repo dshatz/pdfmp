@@ -145,7 +145,16 @@ kotlin {
     sourceSets {
         val skikoMain by getting {
             dependencies {
+                // Native stays on the stable Skiko: the fresh one's klibs need a newer Kotlin than 2.3.
                 implementation(libs.skiko)
+            }
+        }
+        if (freshCompose) {
+            // The JVM classpath resolves to the higher version of the two.
+            val jvmMain by getting {
+                dependencies {
+                    implementation(libs.skiko.fresh)
+                }
             }
         }
         val androidMain by getting {

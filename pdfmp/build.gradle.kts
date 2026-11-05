@@ -293,7 +293,11 @@ kotlin {
             }
         }
         jvmTest.dependencies {
-            val skikoVersion = libs.versions.skiko.get()
+            val skikoVersion = if (freshCompose) {
+                libs.versions.skiko.fresh.get()
+            } else {
+                libs.versions.skiko.asProvider().get()
+            }
 
             val osName = System.getProperty("os.name").lowercase()
             val osArch = System.getProperty("os.arch").lowercase()

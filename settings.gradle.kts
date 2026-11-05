@@ -32,15 +32,21 @@ develocity {
 
 includeBuild("pdfmp-wasmJs-plugin")
 
-// Same list the kni plugin reads; unset means all targets.
-val allowedTargets = (
-    providers.gradleProperty("kniAllowedTargets").orNull
+fun getProp(key: String): String? {
+    return providers.gradleProperty(key).orNull
         ?: java.util.Properties().apply {
             file("local.properties").takeIf { it.exists() }?.reader()?.use(::load)
-        }.getProperty("kniAllowedTargets")
+        }.getProperty(key)
+}
+
+// Same list the kni plugin reads; unset means all targets.
+val allowedTargets = (
+    getProp("kniAllowedTargets")
     )?.split(",")?.map { it.trim() }
 val wasmEnabled = allowedTargets == null || "wasmJs" in allowedTargets
 gradle.extra["wasmEnabled"] = wasmEnabled
+val freshCompose = getProp("freshCompose")
+if (freshCompose == "true") System.setProperty("freshCompose", "true") else System.clearProperty("freshCompose")
 
 include(":pdfmp")
 include(":pdfium")
