@@ -1,6 +1,5 @@
 package com.dshatz.pdfmp.compose
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -40,7 +38,6 @@ import com.dshatz.pdfmp.compose.state.PdfState
 import com.dshatz.pdfmp.compose.tools.drawPixmap
 import com.dshatz.pdfmp.compose.tools.pageTransformModifier
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
-import com.dshatz.pdfmp.w
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -99,7 +96,10 @@ fun PdfView(
                 state,
                 modifier = Modifier.matchParentSize()
             )
-            TiledViewport(state, Modifier.matchParentSize())
+            // A new document starts with a new viewport: its DisposableEffect frees the previous document's tiles.
+            key(state.dataHash.value) {
+                TiledViewport(state, Modifier.matchParentSize())
+            }
         }
     }
 }
@@ -234,7 +234,7 @@ private fun FullPages(
     val scope = rememberCoroutineScope()
     val pagesToRender by state.pagesToRender
     for (pageIdx in pagesToRender) {
-        key(pageIdx) {
+        key(pageIdx, state.dataHash.value) {
             DisposableEffect(pageIdx) {
                 val job = scope.launch {
                     try {

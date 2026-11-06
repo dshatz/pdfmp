@@ -3,6 +3,7 @@ package com.dshatz.pdfmp.compose.state
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
@@ -68,8 +69,10 @@ fun rememberPdfState(
     val scope = rememberCoroutineScope()
     val pageSpacingPx = with(LocalDensity.current) { pageSpacing.toPx().toInt() }
     // One state per document: its buffer pool, renderer and render bookkeeping must not outlive the document.
-    val state = remember(data) { PdfState(pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
-    LaunchedEffect(state) {
+    val state = remember { PdfState(pageRange = pageRange, pageSpacing = pageSpacingPx, scope = scope) }
+    // The buffer pool outlives document changes (its buffers are reused), but not the state.
+    DisposableEffect(state) { onDispose { state.releaseBuffers() } }
+    LaunchedEffect(data) {
         val renderer = try {
             withContext(Dispatchers.Default) { data.createRenderer(context) }
         } catch (e: CancellationException) {
@@ -78,7 +81,7 @@ fun rememberPdfState(
             state.failOpening(e)
             return@LaunchedEffect
         }
-        state.openDocument(renderer)
+        state.openDocument(renderer, data.hashCode())
     }
     return state
 }
@@ -105,7 +108,7 @@ class PdfState(
      */
     private lateinit var horizontalScrollState: ScrollState
 
-    private lateinit var bufferPool: ImageBufferPool
+    private val bufferPool: ImageBufferPool = ImageBufferPool()
     internal lateinit var pages: LinkedHashMap<Int, PdfPageState>
 
     internal val pageRatios: SnapshotStateMap<Int, Float?> = mutableStateMapOf()
@@ -653,11 +656,34 @@ class PdfState(
     }
 
     private var renderer: PdfRenderer? = null
-    internal suspend fun openDocument(renderer: PdfRenderer) {
+
+    val dataHash: State<Int> = mutableStateOf(0)
+
+    /** Serializes documents: the previous one is fully closed (in its `finally`) before the next one opens. */
+    private val lifecycle = Mutex()
+
+    /** Closes the buffer pool; call when the state is no longer used. Renders still running close their buffers after. */
+    internal fun releaseBuffers() = bufferPool.close()
+
+    internal suspend fun openDocument(renderer: PdfRenderer, dataHash: Int) {
+        var owned = false
+        try {
+            lifecycle.withLock {
+                owned = true
+                openOwnedDocument(renderer, dataHash)
+            }
+        } finally {
+            // Cancelled while waiting for the previous document to close: nobody else would close this renderer.
+            if (!owned) withContext(NonCancellable) { renderer.close() }
+        }
+    }
+
+    private suspend fun openOwnedDocument(renderer: PdfRenderer, dataHash: Int) {
         this.renderer = renderer
+        // Ratios of the previous document must not size this one's pages.
+        pageRatios.clear()
+        (this.dataHash as MutableState<Int>).value = dataHash
         closing = false
-        // Created first, so finally can close it even if opening is cancelled.
-        bufferPool = ImageBufferPool()
         try {
             runCatching { renderer.openDocument().getOrThrow() }.onFailure {
                 d("Failed to open document: $it")
@@ -679,7 +705,6 @@ class PdfState(
                 closing = true
                 activeRenders.first { it == 0 }
                 renderer.close()
-                bufferPool.close()
             }
         }
     }
@@ -755,4 +780,4 @@ private val PREFETCH_DELAY = 300.milliseconds
  * Placeholders show only until the tiles covering them arrive; small ones are cheap to render, to keep in memory and
  * to upload to the GPU when their page scrolls into view.
  */
-internal const val FULL_PAGE_RESOLUTION = 0.33f
+internal const val FULL_PAGE_RESOLUTION = 1f
