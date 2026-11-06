@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class, ExperimentalWasmDsl::class)
 
 import com.dshatz.kni.bundlesNatives
+import com.vanniktech.maven.publish.DeploymentValidation
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
@@ -11,6 +12,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.serial)
     alias(libs.plugins.android.lib)
+    alias(libs.plugins.publish)
 }
 
 group = "com.dshatz"
@@ -171,5 +173,37 @@ kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
         optIn.add("kotlinx.cinterop.ExperimentalForeignApi")
+    }
+}
+
+mavenPublishing {
+    signAllPublications()
+    publishToMavenCentral(true, DeploymentValidation.NONE)
+    coordinates("com.dshatz.pdfmp", "image-buffer", project.version.toString())
+
+    pom {
+        name.set("PDF Multiplatform - ImageBuffers")
+        description.set("A multiplatform PDF display library for Kotlin.")
+        inceptionYear.set("2025")
+        url.set("https://github.com/dshatz/pdfmp/")
+        licenses {
+            license {
+                name.set("The Apache License, Version 2.0")
+                url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                distribution.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+            }
+        }
+        developers {
+            developer {
+                id.set("dshatz")
+                name.set("Daniels Šatcs")
+                url.set("https://github.com/dshatz/")
+            }
+        }
+        scm {
+            url.set("https://github.com/dshatz/pdfmp/")
+            connection.set("scm:git:git://github.com/dshatz/pdfmp.git")
+            developerConnection.set("scm:git:ssh://git@github.com/dshatz/pdfmp.git")
+        }
     }
 }

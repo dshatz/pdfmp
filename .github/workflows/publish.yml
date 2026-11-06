@@ -32,6 +32,8 @@ jobs:
           ./gradlew \
             :pdfmp:publishAndReleaseToMavenCentral \
             :pdfmp-compose:publishAndReleaseToMavenCentral \
+            :image-buffer:publishAndReleaseToMavenCentral \
+            :pdfium:publishAndReleaseToMavenCentral \
             -Pversion=$VERSION \
             --build-cache \
             --no-configuration-cache
