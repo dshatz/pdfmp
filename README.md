@@ -1,10 +1,13 @@
-# PDF Viewer library for Kotlin Multiplatform and Compose Multiplatform.
+# PDF viewer for Compose Multiplatform & Kotlin Multiplatform: Android, iOS, Desktop (JVM) and Web (Wasm). Powered by pdfium.
 
 ![](https://img.shields.io/badge/Linux%20x64/arm64-blue?style=for-the-badge&logo=linux)
 ![](https://img.shields.io/badge/MacOS%20x64/arm64-blue?style=for-the-badge&logo=apple)
 ![](https://img.shields.io/badge/Windows%20(x64)-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48IS0tIFVwbG9hZGVkIHRvOiBTVkcgUmVwbywgd3d3LnN2Z3JlcG8uY29tLCBHZW5lcmF0b3I6IFNWRyBSZXBvIE1peGVyIFRvb2xzIC0tPg0KPHN2ZyB3aWR0aD0iODAwcHgiIGhlaWdodD0iODAwcHgiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4NCiAgPHRpdGxlPm1pY3Jvc29mdF93aW5kb3dzPC90aXRsZT4NCiAgPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSJub25lIi8+DQogIDxwYXRoIGQ9Ik0zLDEyVjYuNzVMOSw1LjQzdjYuNDhMMywxMk0yMCwzdjguNzVMMTAsMTEuOVY1LjIxTDIwLDNNMywxM2w2LC4wOVYxOS45TDMsMTguNzVWMTNtMTcsLjI1VjIyTDEwLDIwLjA5di03WiIvPg0KPC9zdmc+)
 ![](https://img.shields.io/badge/Android%20(all%20eabis)-blue?style=for-the-badge&logo=android)
 ![](https://img.shields.io/badge/iOS%20(x64/arm64/simulator)-blue?style=for-the-badge&logo=ios)
+![](https://img.shields.io/badge/WASM-green?style=for-the-badge&logo=webassembly)
+
+pdfmp is a PDF viewer library for Compose Multiplatform. Show PDFs in Android, iOS, desktop and web apps with one PdfView composable: smooth zoom and scrolling, sharp tiled rendering, and progressive loading from URLs, files, Android content URIs or custom sources.
 
 This library wraps [libpdfium](https://pdfium.googlesource.com/pdfium/) (the Chromium PDF engine). The pre-compiled pdfium files are taken from [here](https://github.com/bblanchon/pdfium-binaries) and bundled into this library.
 
@@ -14,6 +17,7 @@ This library wraps [libpdfium](https://pdfium.googlesource.com/pdfium/) (the Chr
     - Linux x64, ARM64
     - Windows X64
     - MacOS X64, ARM64
+- wasmJs
 - iOS
     - x64 (simulator)
     - arm64
@@ -24,11 +28,38 @@ This library wraps [libpdfium](https://pdfium.googlesource.com/pdfium/) (the Chr
  ![Maven Central Version](https://img.shields.io/maven-central/v/com.dshatz.pdfmp/pdfmp)
 
  ```kotlin
- implementation("com.dshatz.pdfmp:pdfmp-compose:1.0.9")
+ implementation("com.dshatz.pdfmp:pdfmp-compose:1.1.1")
 ```
 
 ```toml
-pdfmp = { module = "com.dshatz.pdfmp:pdfmp-compose", version = "1.0.9" }
+pdfmp = { module = "com.dshatz.pdfmp:pdfmp-compose", version = "1.1.1" }
+```
+
+### Web (Kotlin/Wasm) setup
+
+On the web, pdfium runs as WebAssembly inside a web worker, so pages render without blocking the UI.
+The worker is wired in by the [Kotlin-WebWorker](https://github.com/dshatz/Kotlin-WebWorker) Gradle plugin.
+
+**build.gradle.kts**
+```kotlin
+plugins {
+    id("com.dshatz.jsworker") version "0.1.3"
+}
+
+kotlin {
+    wasmJs {
+        browser()
+    }
+    sourceSets {
+        commonMain.dependencies {
+            implementation("com.dshatz.pdfmp:pdfmp-compose:1.1.1")
+        }
+    }
+}
+
+dependencies {
+    "wasmJsWorker"("com.dshatz.pdfmp:pdfium-wasm:1.1.1")
+}
 ```
 
 ### Load the pdf
@@ -125,4 +156,4 @@ state.zoomBy(zoomFactor = 1.25f, centroid = Offset(x, y))
 | Custom sources                 | ✅        | `PdfData.randomAccess` with your own `PdfRandomAccess`. Only the parts needed are read.                                         |
 | Zooming and scrolling          | ✅        | Loading the high-res image is debounced by 100ms. On desktop, horizontal scrolling can only be done with Shift+Vertical scroll. |
 | Filtering pages                | ✅        | Pass page range to rememberPdfState                                                                                             |
-
+| Text extraction                |           | Coming soon.
