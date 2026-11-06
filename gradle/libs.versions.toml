@@ -1,5 +1,4 @@
 [versions]
-componentsResources = "1.11.1"
 kotlin = "2.3.20"
 jni = "2.4.0-Beta01"
 jsworker = "0.1.3"
@@ -22,7 +21,7 @@ compose = { id = "org.jetbrains.compose", version.ref = "compose" } # Last versi
 publish = { id = "com.vanniktech.maven.publish", version.ref = "publish" }
 testballoon = { id = "de.infix.testBalloon", version.ref = "testballoon" }
 kni = { id = "com.dshatz.kni", version.ref = "jni" }
-wasmplugin = { id = "com.dshatz.wasm-plugin", version = "" }
+wasmplugin = { id = "com.dshatz.pdfmp.wasm-plugin", version = "" }
 serial = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 jsworker = { id = "com.dshatz.jsworker", version.ref = "jsworker" }
 
