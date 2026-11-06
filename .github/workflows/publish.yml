@@ -34,6 +34,7 @@ jobs:
             :pdfmp-compose:publishAndReleaseToMavenCentral \
             :image-buffer:publishAndReleaseToMavenCentral \
             :pdfium:publishAndReleaseToMavenCentral \
+            :pdfium-wasm:publishAndReleaseToMavenCentral \
             -Pversion=$VERSION \
             --build-cache \
             --no-configuration-cache
