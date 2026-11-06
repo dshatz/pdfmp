@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.GeneratingTokens
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Link
@@ -50,6 +51,7 @@ import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
@@ -78,6 +80,7 @@ import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.io.buffered
@@ -86,6 +89,7 @@ import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.files.SystemTemporaryDirectory
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 
 /** A demo in the drawer. [description] says how its document is loaded. */
 class Demo(
@@ -136,6 +140,24 @@ private fun demoSections() = listOf(
         )
     ),
     DemoSection("Platform", platformDemos()),
+    DemoSection("Dynamic", listOf(
+        Demo("Generated", "Dynamically generated document", Icons.Default.GeneratingTokens) {
+            Column {
+                var text by remember { mutableStateOf("Hello, dynamic PDF!\n\nType here to regenerate the document.") }
+                TextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text("PDF Content") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                val data by produceState<PdfData?>(null, text) {
+                    delay(300.milliseconds) // debounce typing
+                    value = PdfData.bytes(withContext(Dispatchers.Default) { SimplePdfWriter.generate(text) })
+                }
+                Box(Modifier.weight(1f)) { DocumentView(data) }
+            }
+        }
+    ))
 ).filter { it.demos.isNotEmpty() }
 
 /** Demos of the sources specific to this platform, e.g. its file picker. */
