@@ -11,6 +11,8 @@ pdfmp is a PDF viewer library for Compose Multiplatform. Show PDFs in Android, i
 
 This library wraps [libpdfium](https://pdfium.googlesource.com/pdfium/) (the Chromium PDF engine). The pre-compiled pdfium files are taken from [here](https://github.com/bblanchon/pdfium-binaries) and bundled into this library.
 
+<img src="demo.png" alt="PDF Viewer Demo" height="600"/>
+
 ## Supported targets
 - Android
 - JVM Desktop
