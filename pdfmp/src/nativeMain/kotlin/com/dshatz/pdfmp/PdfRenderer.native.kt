@@ -23,11 +23,15 @@ import kotlinx.cinterop.Pinned
 import kotlinx.cinterop.UnsafeNumber
 import kotlinx.cinterop.pin
 import kotlinx.cinterop.toLong
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.decrementAndFetch
+import kotlin.concurrent.atomics.incrementAndFetch
 
 
 // render, renderTile, getPageCount and getPageRatio are inherited from PdfiumRenderer, so the expect's @JniCall can't be repeated here.
 @Suppress("ACTUAL_ANNOTATIONS_NOT_MATCH_EXPECT")
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class)
 actual class PdfRenderer: PdfiumRenderer {
 
     private val customSource: CustomPdfSourceAdapter?
@@ -84,7 +88,12 @@ actual class PdfRenderer: PdfiumRenderer {
     actual override suspend fun openDocument(): Result<Unit> {
         return runCatching {
             d("Source: $source")
-            if (customSource != null) openProgressive(customSource) else doc = createDocumentHandle()
+            users.incrementAndFetch()
+            try {
+                if (customSource != null) openProgressive(customSource) else doc = createDocumentHandle()
+            } finally {
+                endUse()
+            }
         }.onFailure {
             it.printStackTrace()
         }
@@ -168,10 +177,16 @@ actual class PdfRenderer: PdfiumRenderer {
         Pdfium.ClosePage(this)
     }
 
-    /**
-     * Call this when the Screen/Component is destroyed
-     */
-    actual override fun close() {
+    /** 1 until [close], plus 1 while opening: a cancelled open keeps running natively, so it may outlive [close]. */
+    private val users = AtomicInt(1)
+
+    private fun endUse() {
+        if (users.decrementAndFetch() == 0) release()
+    }
+
+    actual override fun close() = endUse()
+
+    private fun release() {
         runCatching {
             pageHandleCache.forEach {
                 it.value.closePage()
