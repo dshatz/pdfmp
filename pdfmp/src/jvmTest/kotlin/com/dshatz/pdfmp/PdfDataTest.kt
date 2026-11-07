@@ -5,6 +5,13 @@ import de.infix.testBalloon.framework.core.testSuite
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import kotlinx.io.files.Path
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -124,6 +131,47 @@ val PdfDataTest by testSuite {
             // HEAD, then the range probe, answered with the whole document.
             requests.count { it.startsWith("GET") } shouldBe 1
         }
+    }
+
+    test("closing while a progressive open waits for a read") {
+        InitLib.init()
+        val events = mutableListOf<String>()
+        val reading = CompletableDeferred<Unit>()
+        val gate = CompletableDeferred<Unit>()
+        val closed = CompletableDeferred<Unit>()
+        val source = object : PdfRandomAccess {
+            override suspend fun length() = sampleBytes.size.toLong()
+            override suspend fun read(position: Long, destination: ByteArray, offset: Int, length: Int) {
+                reading.complete(Unit)
+                // Like a blocking read, it finishes even if the open is cancelled.
+                withContext(NonCancellable) { gate.await() }
+                sampleBytes.copyInto(destination, offset, position.toInt(), position.toInt() + length)
+                synchronized(events) { events += "read" }
+            }
+            override fun close() {
+                synchronized(events) { events += "close" }
+                closed.complete(Unit)
+            }
+        }
+        val renderer = PdfData.randomAccess(source).createRenderer(noPlatformContext!!)
+        // Real time: the test scope's virtual time would fire the timeout at once.
+        withContext(Dispatchers.Default) {
+            withTimeout(10_000) {
+                // Like PdfState when the PdfData changes: the open is cancelled and the renderer closed mid-read.
+                val open = async { renderer.openDocument() }
+                reading.await()
+                open.cancel()
+                renderer.close()
+                // Let the cancelled call return, so the JVM side disposes the native renderer before the read ends.
+                delay(300)
+                gate.complete(Unit)
+                closed.await()
+            }
+            // Give a use-after-free in the native loop time to crash the JVM.
+            delay(500)
+        }
+        // The source closes only once the open stopped reading.
+        synchronized(events) { events.last() shouldBe "close" }
     }
 
     test("file URI paths") {
