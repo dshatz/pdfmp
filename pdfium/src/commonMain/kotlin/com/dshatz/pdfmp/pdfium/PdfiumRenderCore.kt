@@ -1,5 +1,8 @@
 package com.dshatz.pdfmp.pdfium
 
+/** pdfium's `FPDF_ANNOT`: also draw annotations. Form widgets are not included, they need `FPDF_FFLDraw`. */
+private const val FPDF_ANNOT = 0x01
+
 /**
  * Rendering steps shared by all platforms. Runs wherever pdfium lives: in-process on native, inside the web worker
  * on wasm, so that a whole render is a single call across the worker boundary.
@@ -18,7 +21,7 @@ object PdfiumRenderCore {
     /** Renders the whole page at [width] x [height] into the top-left corner of [bitmap]. */
     fun renderPage(pdfium: IPdfium, bitmap: PdfiumBitmap, page: PageHandle, width: Int, height: Int) {
         pdfium.BitmapFillRect(bitmap, 0, 0, width, height, 0xFFFFFFFFu)
-        pdfium.RenderPageBitmap(bitmap, page, 0, 0, width, height, 0, 0)
+        pdfium.RenderPageBitmap(bitmap, page, 0, 0, width, height, 0, FPDF_ANNOT)
     }
 
     /**
@@ -51,7 +54,7 @@ object PdfiumRenderCore {
             .scale(scaledPageWidth / pageW, scaledPageHeight / pageH)
             .translate(-x.toFloat(), -y.toFloat())
         val clip = PdfClip(0f, 0f, tileWidth.toFloat(), tileHeight.toFloat())
-        pdfium.RenderPageBitmapWithMatrix(bitmap, page, matrix, clip, 0)
+        pdfium.RenderPageBitmapWithMatrix(bitmap, page, matrix, clip, FPDF_ANNOT)
 
         if (frameColor != null) {
             drawFrame(pdfium, bitmap, tileWidth, tileHeight, frameColor)
