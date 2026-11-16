@@ -183,9 +183,7 @@ kotlin {
 
     val androidTargets = optionalTargets.run {
         listOfNotNull(
-            androidNativeX86(),
             androidNativeX64(),
-            androidNativeArm32(),
             androidNativeArm64()
         )
     }
