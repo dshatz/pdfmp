@@ -90,7 +90,7 @@ actual class PdfRenderer: PdfiumRenderer {
             d("Source: $source")
             users.incrementAndFetch()
             try {
-                if (customSource != null) openProgressive(customSource) else doc = createDocumentHandle()
+                if (customSource != null) openProgressive(customSource) else doc = initFormFill(createDocumentHandle())
             } finally {
                 endUse()
             }
@@ -110,6 +110,10 @@ actual class PdfRenderer: PdfiumRenderer {
     override suspend fun progressiveIsPageAvail(pageIndex: Int): Availability = progressive!!.isPageAvail(pageIndex)
 
     override suspend fun progressiveDocument(): DocHandle? = progressive!!.document()
+
+    override suspend fun progressiveIsFormAvail(): Availability = progressive!!.isFormAvail()
+
+    override suspend fun initFormFill(document: DocHandle): DocHandle = Pdfium.InitFormFillEnvironment(document)
 
     /** The source writes straight into the document's memory, which pdfium reads once the chunks are marked. */
     @OptIn(DelicateBufferAPI::class)

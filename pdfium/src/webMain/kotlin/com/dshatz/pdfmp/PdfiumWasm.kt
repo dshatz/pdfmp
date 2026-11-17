@@ -39,7 +39,24 @@ external object PdfiumWasm {
     fun _FPDFAvail_GetDocument(avail: UInt, password: Int?): UInt
     fun _FPDFAvail_IsPageAvail(avail: UInt, pageIndex: Int, hints: UInt): Int
 
+    fun _FPDF_GetFormType(document: UInt): Int
+    fun _FPDFAvail_IsFormAvail(avail: UInt, hints: UInt): Int
+    fun _FPDFDOC_InitFormFillEnvironment(document: UInt, formInfo: UInt): UInt
+    fun _FPDFDOC_ExitFormFillEnvironment(form: UInt)
+    fun _FPDF_FFLDraw(
+        form: UInt,
+        bitmap: UInt,
+        page: UInt,
+        startX: Int,
+        startY: Int,
+        sizeX: Int,
+        sizeY: Int,
+        rotate: Int,
+        flags: Int
+    )
+
     fun _malloc(size: Int): UInt
+    fun _calloc(count: Int, size: Int): UInt
     fun _free(ptr: UInt)
 }
 

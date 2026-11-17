@@ -1,6 +1,12 @@
 package com.dshatz.pdfmp.pdfium
 
+import com.dshatz.internal.pdfium.FORMTYPE_NONE
 import com.dshatz.internal.pdfium.FPDFBitmap_BGRA
+import com.dshatz.internal.pdfium.FPDFDOC_ExitFormFillEnvironment
+import com.dshatz.internal.pdfium.FPDFDOC_InitFormFillEnvironment
+import com.dshatz.internal.pdfium.FPDF_FFLDraw
+import com.dshatz.internal.pdfium.FPDF_FORMFILLINFO
+import com.dshatz.internal.pdfium.FPDF_GetFormType
 import com.dshatz.internal.pdfium.FPDFBitmap_CreateEx
 import com.dshatz.internal.pdfium.FPDFBitmap_Destroy
 import com.dshatz.internal.pdfium.FPDF_CloseDocument
@@ -20,9 +26,15 @@ import com.dshatz.internal.pdfium.FS_MATRIX
 import com.dshatz.internal.pdfium.FS_RECTF
 import com.dshatz.internal.pdfium.pdfmp_FillRect
 import com.dshatz.internal.pdfium.pdfmp_GetLastError
+import kotlinx.cinterop.alloc
 import kotlinx.cinterop.cValue
 import kotlinx.cinterop.convert
+import kotlinx.cinterop.free
 import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.nativeHeap
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.sizeOf
+import platform.posix.memset
 
 actual object Pdfium: IPdfium {
     actual override fun InitLibrary() {
@@ -45,7 +57,7 @@ actual object Pdfium: IPdfium {
         document: DocHandle,
         pageIndex: Int
     ): PageHandle? {
-        return FPDF_LoadPage(document.ptr, pageIndex)?.let(::PageHandle)
+        return FPDF_LoadPage(document.ptr, pageIndex)?.let { PageHandle(it, document.form) }
     }
 
     actual override fun RenderPageBitmap(
@@ -75,7 +87,37 @@ actual object Pdfium: IPdfium {
     }
 
     actual override fun CloseDocument(document: DocHandle) {
+        document.form?.let(::FPDFDOC_ExitFormFillEnvironment)
+        document.formInfo?.let { nativeHeap.free(it) }
         FPDF_CloseDocument(document.ptr)
+    }
+
+    actual override fun InitFormFillEnvironment(document: DocHandle): DocHandle {
+        if (document.form != null || FPDF_GetFormType(document.ptr) == FORMTYPE_NONE) return document
+        // Zeroed: pdfium calls every callback that is not null. Version 1: no XFA.
+        val info = nativeHeap.alloc<FPDF_FORMFILLINFO>()
+        memset(info.ptr, 0, sizeOf<FPDF_FORMFILLINFO>().convert())
+        info.version = 1
+        val form = FPDFDOC_InitFormFillEnvironment(document.ptr, info.ptr)
+        if (form == null) {
+            nativeHeap.free(info)
+            return document
+        }
+        return DocHandle(document.ptr, form, info)
+    }
+
+    actual override fun FFLDraw(
+        bitmap: PdfiumBitmap,
+        page: PageHandle,
+        startX: Int,
+        startY: Int,
+        sizeX: Int,
+        sizeY: Int,
+        rotate: Int,
+        flags: Int
+    ) {
+        val form = page.form ?: return
+        FPDF_FFLDraw(form, bitmap.bitmap, page.ptr, startX, startY, sizeX, sizeY, rotate, flags)
     }
 
     actual override fun DestroyLibrary() {

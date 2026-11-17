@@ -6,6 +6,7 @@ import com.dshatz.internal.pdfium.FPDFAvail_Create
 import com.dshatz.internal.pdfium.FPDFAvail_Destroy
 import com.dshatz.internal.pdfium.FPDFAvail_GetDocument
 import com.dshatz.internal.pdfium.FPDFAvail_IsDocAvail
+import com.dshatz.internal.pdfium.FPDFAvail_IsFormAvail
 import com.dshatz.internal.pdfium.FPDFAvail_IsPageAvail
 import com.dshatz.internal.pdfium.FPDF_FILEACCESS
 import com.dshatz.internal.pdfium.FX_DOWNLOADHINTS
@@ -70,6 +71,11 @@ actual class ProgressiveDocument actual constructor(length: Int, chunkSize: Int)
 
     actual fun isPageAvail(pageIndex: Int): Availability =
         chunks.check { FPDFAvail_IsPageAvail(avail, pageIndex, downloadHints) }
+
+    actual fun isFormAvail(): Availability = chunks.check {
+        FPDFAvail_IsFormAvail(avail, downloadHints)
+            .let { if (it == Availability.FORM_NOT_EXIST) Availability.AVAILABLE else it }
+    }
 
     actual fun document(): DocHandle? = FPDFAvail_GetDocument(avail, null)?.let(::DocHandle)
 

@@ -1,6 +1,6 @@
 package com.dshatz.pdfmp.pdfium
 
-/** pdfium's `FPDF_ANNOT`: also draw annotations. Form widgets are not included, they need `FPDF_FFLDraw`. */
+/** pdfium's `FPDF_ANNOT`: also draw annotations. Form fields are drawn separately, by [IPdfium.FFLDraw]. */
 private const val FPDF_ANNOT = 0x01
 
 /**
@@ -22,6 +22,7 @@ object PdfiumRenderCore {
     fun renderPage(pdfium: IPdfium, bitmap: PdfiumBitmap, page: PageHandle, width: Int, height: Int) {
         pdfium.BitmapFillRect(bitmap, 0, 0, width, height, 0xFFFFFFFFu)
         pdfium.RenderPageBitmap(bitmap, page, 0, 0, width, height, 0, FPDF_ANNOT)
+        pdfium.FFLDraw(bitmap, page, 0, 0, width, height, 0, FPDF_ANNOT)
     }
 
     /**
@@ -55,6 +56,8 @@ object PdfiumRenderCore {
             .translate(-x.toFloat(), -y.toFloat())
         val clip = PdfClip(0f, 0f, tileWidth.toFloat(), tileHeight.toFloat())
         pdfium.RenderPageBitmapWithMatrix(bitmap, page, matrix, clip, FPDF_ANNOT)
+        // FFLDraw takes no matrix: the same placement as a page drawn at (-x, -y), clipped by the bitmap.
+        pdfium.FFLDraw(bitmap, page, -x, -y, scaledPageWidth, scaledPageHeight, 0, FPDF_ANNOT)
 
         if (frameColor != null) {
             drawFrame(pdfium, bitmap, tileWidth, tileHeight, frameColor)

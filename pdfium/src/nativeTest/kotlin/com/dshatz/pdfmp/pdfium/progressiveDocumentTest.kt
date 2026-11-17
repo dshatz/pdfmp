@@ -62,6 +62,7 @@ val progressiveDocumentTest by testSuite {
         document.load(bytes, fetched) { document.isDocAvail() }
         val doc = document.document() ?: error("No document")
         Pdfium.GetPageCount(doc) shouldBe 9
+        document.load(bytes, fetched) { document.isFormAvail() }
         val fetchedForDocument = fetched.size
 
         document.load(bytes, fetched) { document.isPageAvail(0) }

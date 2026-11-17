@@ -64,7 +64,7 @@ actual class PdfRenderer: PdfiumRenderer {
                         val workerDataPtr = pdfium().transferBytes(source.bytes.toInt8Array())
                         val doc = pdfium().LoadMemDocument(DataPointer(workerDataPtr.ptr), source.bytes.size, null) ?: error("LoadMemDocument returned null")
 
-                        this.doc = doc
+                        this.doc = initFormFill(doc)
                         this.sourceBytesPtr = workerDataPtr.ptr
                     }
                     is PdfSource.PdfPath -> throw UnsupportedOperationException("File paths are not supported on the web, use PdfData.url or PdfData.fromBlob")
@@ -87,6 +87,10 @@ actual class PdfRenderer: PdfiumRenderer {
         pdfium().isPageAvail(progressive!!, pageIndex)
 
     override suspend fun progressiveDocument(): DocHandle? = pdfium().progressiveDocument(progressive!!)
+
+    override suspend fun progressiveIsFormAvail(): Availability = pdfium().isFormAvail(progressive!!)
+
+    override suspend fun initFormFill(document: DocHandle): DocHandle = pdfium().InitFormFillEnvironment(document)
 
     override suspend fun progressiveFill(firstChunk: Int, size: Int, read: suspend (ByteBuffer) -> Unit) {
         val buffer = allocateBuffer(size.toLong())
@@ -148,9 +152,8 @@ actual class PdfRenderer: PdfiumRenderer {
     actual override fun close() {
         GlobalScope.launch {
             if (isDocLoaded()) {
-                pageHandleCache.forEach {
-                    it.value.closePage()
-                }
+                // In order here, not via closePage(): the pages must be closed before their document.
+                pageHandleCache.values.forEach { pdfium().ClosePage(it) }
                 pageHandleCache.clear()
                 pdfium().CloseDocument(doc)
             }

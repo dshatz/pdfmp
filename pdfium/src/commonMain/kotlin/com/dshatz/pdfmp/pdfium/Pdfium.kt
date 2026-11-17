@@ -34,6 +34,28 @@ interface IPdfium {
         flags: Int
     )
 
+    /**
+     * Returns [document] with a form-fill environment, which pdfium needs to draw form fields (text fields, check
+     * boxes, signature fields), see [FFLDraw]. Returns [document] itself when it has no form. Pages opened from the
+     * returned handle carry the environment; [CloseDocument] exits it.
+     */
+    fun InitFormFillEnvironment(document: DocHandle): DocHandle = document
+
+    /**
+     * Draws the form fields of [page], which [RenderPageBitmap] leaves out. Same placement arguments. Draws nothing
+     * unless the page was opened from a document returned by [InitFormFillEnvironment].
+     */
+    fun FFLDraw(
+        bitmap: PdfiumBitmap,
+        page: PageHandle,
+        startX: Int,
+        startY: Int,
+        sizeX: Int,
+        sizeY: Int,
+        rotate: Int,
+        flags: Int
+    ) {}
+
     fun BitmapFillRect(
         bitmap: PdfiumBitmap,
         left: Int,
@@ -76,6 +98,19 @@ expect object Pdfium: IPdfium {
         page: PageHandle,
         matrix: PdfMatrix,
         clip: PdfClip,
+        flags: Int
+    )
+
+    override fun InitFormFillEnvironment(document: DocHandle): DocHandle
+
+    override fun FFLDraw(
+        bitmap: PdfiumBitmap,
+        page: PageHandle,
+        startX: Int,
+        startY: Int,
+        sizeX: Int,
+        sizeY: Int,
+        rotate: Int,
         flags: Int
     )
 
