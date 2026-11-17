@@ -7,6 +7,7 @@ import com.dshatz.pdfmp.PdfiumWasm
 import com.dshatz.pdfmp.Ptr
 import com.dshatz.pdfmp.setFloat32InWasmMemory
 import com.dshatz.pdfmp.wasmPointer
+import com.dshatz.pdfmp.writeWasmByte
 import kotlin.js.Promise
 
 @OptIn(ExperimentalWasmJsInterop::class)
@@ -20,6 +21,11 @@ private fun loadPdfiumModulePromise(): Promise<JsAny> = js(
 )
 
 //suspend fun awaitPdfium() = loadPdfiumModulePromise().await()
+
+private const val FORMTYPE_NONE = 0
+
+/** FPDF_FORMFILLINFO on wasm32: 35 members of 4 bytes each. */
+private const val FORM_FILL_INFO_SIZE = 35 * 4
 
 actual object Pdfium: IPdfium {
     actual override fun InitLibrary() {
@@ -62,7 +68,7 @@ actual object Pdfium: IPdfium {
         pageIndex: Int
     ): PageHandle? {
         val page = PdfiumWasm._FPDF_LoadPage(document.ptr.ptr, pageIndex).wasmPointer()
-        return page?.let(::PageHandle)
+        return page?.let { PageHandle(it, document.form) }
     }
 
     actual override fun BitmapCreateExBGRA(
@@ -180,7 +186,38 @@ actual object Pdfium: IPdfium {
     }
 
     actual override fun CloseDocument(document: DocHandle) {
+        document.form?.let { PdfiumWasm._FPDFDOC_ExitFormFillEnvironment(it.ptr) }
+        document.formInfo?.let { PdfiumWasm._free(it.ptr) }
         PdfiumWasm._FPDF_CloseDocument(document.ptr.ptr)
+    }
+
+    actual override fun InitFormFillEnvironment(document: DocHandle): DocHandle {
+        if (document.form != null || PdfiumWasm._FPDF_GetFormType(document.ptr.ptr) == FORMTYPE_NONE) return document
+        // Zeroed: pdfium calls every callback that is not null. Version 1 (no XFA), as a little-endian int.
+        val info = PdfiumWasm._calloc(1, FORM_FILL_INFO_SIZE)
+        writeWasmByte(info, 1)
+        val form = PdfiumWasm._FPDFDOC_InitFormFillEnvironment(document.ptr.ptr, info).wasmPointer()
+        if (form == null) {
+            PdfiumWasm._free(info)
+            return document
+        }
+        return DocHandle(document.ptr, form, Ptr(info))
+    }
+
+    actual override fun FFLDraw(
+        bitmap: PdfiumBitmap,
+        page: PageHandle,
+        startX: Int,
+        startY: Int,
+        sizeX: Int,
+        sizeY: Int,
+        rotate: Int,
+        flags: Int
+    ) {
+        val form = page.form ?: return
+        PdfiumWasm._FPDF_FFLDraw(
+            form.ptr, bitmap.pdfiumPtr.ptr, page.ptr.ptr, startX, startY, sizeX, sizeY, rotate, flags
+        )
     }
 
     actual override fun GetPageWidthF(page: PageHandle): Float {

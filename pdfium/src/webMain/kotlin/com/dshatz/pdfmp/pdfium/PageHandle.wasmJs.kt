@@ -5,5 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 actual class PageHandle(
-    val ptr: Ptr
+    val ptr: Ptr,
+    /** The form-fill environment of the page's document. */
+    val form: Ptr? = null,
 )
