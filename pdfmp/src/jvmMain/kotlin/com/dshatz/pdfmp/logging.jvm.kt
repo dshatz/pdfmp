@@ -1,7 +1,7 @@
 package com.dshatz.pdfmp
 
 actual fun isDebug(): Boolean {
-    return System.getenv("PDFMP_DEBUG") == "true"
+    return PDFMP.enableLogs || System.getenv("PDFMP_DEBUG") == "true"
 }
 
 internal actual fun logPlatform(level: com.dshatz.pdfmp.LogLevel, tag: String, message: String) {
