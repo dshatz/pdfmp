@@ -248,7 +248,6 @@ kotlin {
             implementation(libs.coroutines)
             implementation(libs.jni.annotations)
             implementation(libs.jni.buffers)
-            api(libs.jni.flows)
             implementation(libs.jni.serialization)
             implementation(libs.atomic)
             implementation(libs.serial)
