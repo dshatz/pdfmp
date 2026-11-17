@@ -33,6 +33,7 @@ import com.dshatz.pdfmp.compose.platformModifier.rememberPlatformContext
 import com.dshatz.pdfmp.d
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -512,8 +513,8 @@ class PdfState(
             // Placeholders of visible pages first: the worker handles requests in order, so a page render queued
             // behind dozens of tile renders would leave the page blank for a long time.
             pendingFullPageRenders.first { it == 0 }
-            val (buffer, needsRender) = bufferPool.getBufferTile(tile)
-            if (needsRender) {
+            val (buffer, render) = getTileBuffer(tile)
+            if (render != null) try {
                 try {
                     measureTime {
                         renderToCompletion { bufferPool.withRendering(buffer) { renderer!!.renderTile(tile, buffer) } }
@@ -526,10 +527,33 @@ class PdfState(
                 // New pixels: drop the cached image so they get uploaded. Only here, so a tile that is still
                 // rendered (e.g. when scrolling back) keeps its texture instead of being uploaded again.
                 buffer.reset()
+            } finally {
+                withContext(NonCancellable) { tileRendersMutex.withLock { tileRenders.remove(tile) } }
+                render.complete(Unit)
             }
             return buffer
         } finally {
             pendingTileRenders.update { it - 1 }
+        }
+    }
+
+    /** Tiles being rendered. Until done, their buffer holds the pixels of whatever tile used it before. */
+    private val tileRenders = HashMap<PdfTile, CompletableDeferred<Unit>>()
+    private val tileRendersMutex = Mutex()
+
+    /**
+     * The pool's buffer for [tile], and a deferred to complete once rendered if the caller must render it.
+     * If the tile is still being rendered (by a cancelled job whose render runs to completion), waits for that render.
+     */
+    private suspend fun getTileBuffer(tile: PdfTile): Pair<ImageBuffer, CompletableDeferred<Unit>?> {
+        while (true) {
+            val inFlight = tileRendersMutex.withLock {
+                val (buffer, needsRender) = bufferPool.getBufferTile(tile)
+                if (needsRender) return buffer to CompletableDeferred<Unit>().also { tileRenders[tile] = it }
+                tileRenders[tile] ?: return buffer to null
+            }
+            // Then check again: the render may have failed and freed the buffer.
+            inFlight.await()
         }
     }
 

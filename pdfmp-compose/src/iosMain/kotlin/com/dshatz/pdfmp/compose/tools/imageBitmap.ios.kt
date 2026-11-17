@@ -7,7 +7,6 @@ import androidx.compose.ui.graphics.drawscope.DrawContext
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.IntSize
 import com.dshatz.pdfmp.imagebuffer.ImageBuffer
-import org.jetbrains.skia.Image
 import org.jetbrains.skia.Rect
 
 internal actual val bufferColorFilter: ColorFilter = ColorFilter.colorMatrix(ColorMatrix())
@@ -16,9 +15,8 @@ actual fun DrawContext.drawPixmap(
     dstOffset: Offset,
     dstSize: IntSize
 ) {
-    val image = Image.makeFromPixmap(buffer.pixmap)
     canvas.nativeCanvas.drawImageRect(
-        image = image,
+        image = buffer.image,
         dst = Rect(dstOffset.x, dstOffset.y, dstOffset.x + dstSize.width, dstOffset.y + dstSize.height),
         paint = null
     )
