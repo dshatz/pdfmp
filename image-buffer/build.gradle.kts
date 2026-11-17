@@ -131,7 +131,8 @@ kotlin {
 
     androidLibrary {
         namespace = "com.dshatz.pdfmp.imagebuffer"
-        compileSdk = 37
+        compileSdk = libs.versions.compileSdk.get().toInt()
+        aarMetadata.minCompileSdk = libs.versions.minCompileSdk.get().toInt()
         minSdk = 24
 
         withDeviceTestBuilder {

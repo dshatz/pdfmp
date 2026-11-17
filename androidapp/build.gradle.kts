@@ -10,7 +10,7 @@ kotlin {
 
 android {
     namespace = "com.dshatz.pdfmp.sample"
-    compileSdk = 37
+    compileSdk = libs.versions.compileSdk.get().toInt()
     defaultConfig {
         minSdk = 24
     }

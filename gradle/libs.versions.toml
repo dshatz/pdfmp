@@ -10,6 +10,9 @@ skiko = "0.9.22.2"
 testballoon = "1.2.0"
 compose = "1.10.3"
 
+compileSdk = "37"
+minCompileSdk = "35"
+
 [plugins]
 mp = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

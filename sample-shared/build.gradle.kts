@@ -21,7 +21,8 @@ kotlin {
     }
     android {
         namespace = "com.dshatz.pdfmp.sampleshared"
-        compileSdk = 37
+        compileSdk = libs.versions.compileSdk.get().toInt()
+        aarMetadata.minCompileSdk = libs.versions.minCompileSdk.get().toInt()
         minSdk = 24
         androidResources.enable = true
     }
