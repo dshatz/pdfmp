@@ -92,6 +92,8 @@ class PdfiumWebWorker: IPdfium by Pdfium {
     fun isPageAvail(handle: ProgressiveDocHandle, pageIndex: Int): Availability =
         progressiveDocuments.getValue(handle.id).isPageAvail(pageIndex)
 
+    fun isFormAvail(handle: ProgressiveDocHandle): Availability = progressiveDocuments.getValue(handle.id).isFormAvail()
+
     fun progressiveDocument(handle: ProgressiveDocHandle): DocHandle? =
         progressiveDocuments.getValue(handle.id).document()
 

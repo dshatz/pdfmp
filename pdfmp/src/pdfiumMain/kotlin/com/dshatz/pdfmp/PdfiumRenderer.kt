@@ -120,7 +120,10 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
         progressiveSource = source
         progressiveOpen(documentLength.toInt(), PROGRESSIVE_CHUNK_SIZE)
         awaitAvailable { progressiveIsDocAvail() }
-        doc = progressiveDocument() ?: error("FPDFAvail_GetDocument returned null")
+        val document = progressiveDocument() ?: error("FPDFAvail_GetDocument returned null")
+        // pdfium reads the form when the environment is created, so its data must be in first.
+        awaitAvailable { progressiveIsFormAvail() }
+        doc = initFormFill(document)
     }
 
     /** Fetches the chunks [availability] reports missing until it reports the data available. */
@@ -156,6 +159,10 @@ abstract class PdfiumRenderer: AutoCloseable, IPDfRenderer {
     protected abstract suspend fun progressiveIsDocAvail(): Availability
     protected abstract suspend fun progressiveIsPageAvail(pageIndex: Int): Availability
     protected abstract suspend fun progressiveDocument(): DocHandle?
+    protected abstract suspend fun progressiveIsFormAvail(): Availability
+
+    /** [com.dshatz.pdfmp.pdfium.IPdfium.InitFormFillEnvironment], so that form fields are drawn. */
+    protected abstract suspend fun initFormFill(document: DocHandle): DocHandle
 
     /** Lets [read] write [size] bytes starting at chunk [firstChunk], then makes them available to pdfium. */
     protected abstract suspend fun progressiveFill(firstChunk: Int, size: Int, read: suspend (ByteBuffer) -> Unit)

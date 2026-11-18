@@ -9,6 +9,9 @@ data class Availability(val status: Int, val missingChunks: List<Int>) {
         const val ERROR = -1
         const val NOT_AVAILABLE = 0
         const val AVAILABLE = 1
+
+        /** FPDFAvail_IsFormAvail's PDF_FORM_NOTEXIST. */
+        const val FORM_NOT_EXIST = 2
     }
 }
 
@@ -24,6 +27,9 @@ expect class ProgressiveDocument(length: Int, chunkSize: Int) {
 
     fun isDocAvail(): Availability
     fun isPageAvail(pageIndex: Int): Availability
+
+    /** Whether the form data is in, after [document]. A document without a form is [Availability.AVAILABLE]. */
+    fun isFormAvail(): Availability
 
     /** The document, once [isDocAvail] reported it available. */
     fun document(): DocHandle?

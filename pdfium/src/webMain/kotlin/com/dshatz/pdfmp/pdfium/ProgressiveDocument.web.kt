@@ -46,6 +46,11 @@ actual class ProgressiveDocument actual constructor(length: Int, chunkSize: Int)
     actual fun isPageAvail(pageIndex: Int): Availability =
         chunks.check { PdfiumWasm._FPDFAvail_IsPageAvail(avail, pageIndex, WebCallbacks.hints) }
 
+    actual fun isFormAvail(): Availability = chunks.check {
+        PdfiumWasm._FPDFAvail_IsFormAvail(avail, WebCallbacks.hints)
+            .let { if (it == Availability.FORM_NOT_EXIST) Availability.AVAILABLE else it }
+    }
+
     actual fun document(): DocHandle? = PdfiumWasm._FPDFAvail_GetDocument(avail, null).wasmPointer()?.let(::DocHandle)
 
     actual fun destroy() {
