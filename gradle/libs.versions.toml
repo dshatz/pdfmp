@@ -8,7 +8,7 @@ publish = "0.37.0"
 runner = "1.7.0"
 skiko = "0.9.22.2"
 testballoon = "1.2.0"
-compose = "1.10.3"
+compose = "1.12.2"
 
 [plugins]
 mp = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
