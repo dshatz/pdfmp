@@ -156,6 +156,12 @@ private fun demoSections() = listOf(
                 }
                 Box(Modifier.weight(1f)) { DocumentView(data) }
             }
+        },
+        Demo("Form", "With form elements", Icons.Default.GeneratingTokens) {
+            Column {
+                val data = PdfData.uri(Res.getUri("files/form.pdf"))
+                Box(Modifier.weight(1f)) { DocumentView(data) }
+            }
         }
     ))
 ).filter { it.demos.isNotEmpty() }
